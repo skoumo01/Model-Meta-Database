@@ -9,33 +9,31 @@ class contract_models extends Contract {
         
     }
 
-    async writeRoundData(ctx, id, timestamp, round, server_state, sampled_train_data, clients_participated, broadcasted_bits, aggregated_bits) {
+    // createModel creates a new ledger entry for the received model.
+    // This corresponds to the model's v1.
+    async createModelEntry(ctx, timestamp, model_id, serialized_model) {
 
-        const Mnist_Round_Data = {
+        const Model_Data = {
             timestamp: timestamp,
-            round: round,
-            server_state: server_state,
-            sampled_train_data: sampled_train_data,
-            clients_participated: clients_participated,
-            broadcasted_bits: broadcasted_bits,
-            aggregated_bits: aggregated_bits,
+            serialized_model: serialized_model,
         };
 
-        return ctx.stub.putState(id, Buffer.from(JSON.stringify(Mnist_Round_Data)));
+        return ctx.stub.putState(model_id, Buffer.from(JSON.stringify(Model_Data)));
 
     }
 
-    // ReadAsset returns the asset stored in the world state with given id.
-    async queryRoundData(ctx, id) {
+    // getLatestVersion returns the model stored in the world state with given id.
+    // This corresponds to the model's latest version.
+    async getLatestVersion(ctx, model_id) {
 
-        const Mnist_Round_Data = await ctx.stub.getState(id);
-        if (!Mnist_Round_Data || Mnist_Round_Data.length === 0) {
-            throw new Error(`The Model ${id} does not exist`);
+        const Model_Data = await ctx.stub.getState(model_id);
+        if (!Model_Data || Model_Data.length === 0) {
+            throw new Error(`The Model ${model_id} does not exist`);
         }
 
-        var record = JSON.parse(Mnist_Round_Data)
+        var data = JSON.parse(Model_Data)
     
-        return JSON.stringify(record);
+        return JSON.stringify(data);
     }
 
 }
