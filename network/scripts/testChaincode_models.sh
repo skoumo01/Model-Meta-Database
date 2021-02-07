@@ -38,4 +38,4 @@ query(){
 model=$(<./scripts/testChaincode_data/model_base64)
 
 #write
-query
+#query

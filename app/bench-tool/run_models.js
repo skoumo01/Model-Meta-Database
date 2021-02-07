@@ -3,7 +3,7 @@ const Client = require('fabric-client');
 const { exit } = require('process');
 
 var myArgs = process.argv.slice(2);
-//node test_models.js org1 Admin peer0.org1.example.com mychannel contract_models 1 false createModel
+//node test_models.js org1 Admin peer0.org1.example.com mychannel contract_models 1 createModel id_0 model_str
 
 // Arguments Parcing
 const ORG_NAME = myArgs[0];
@@ -13,7 +13,8 @@ const CHANNEL_NAME = myArgs[3];
 const CHAINCODE_ID = myArgs[4];
 const NUMBER_OF_TXS = parseInt(myArgs[5]);
 const FUNCTION_CALL = myArgs[6]; // "createModel"/"getLatest"
-
+const MODEL_ID = myArgs[7];
+const MODEL_STR = myArgs[8];
 
 // Constants for profile
 const CONNECTION_PROFILE_PATH = './profiles/dev-connect.yaml';
@@ -42,7 +43,9 @@ var hrstart = [];
 var hrend = [];
 var total_time = [];
 
-main()
+if (require.main === module){
+    main();
+}
 
 async function main() {
 
@@ -50,22 +53,18 @@ async function main() {
 
     channel = await setupChannel();
 
-    var model_id = 'id_100';
-
-    if (FUNCTION_CALL=='createModel'){
-
+    if (FUNCTION_CALL==='createModel'){
         //generate pseudo model data
         var Tx = {};
-        Tx.model_id = model_id;
-        Tx.serialized_model = generateBase64String(4688);
+        Tx.model_id = MODEL_ID;
+        Tx.serialized_model = MODEL_STR; //generateBase64String(4688);
         
         //simple POST
         createModel(Tx);
 
     }else if (FUNCTION_CALL==='getLatest'){
-
         //simple GET
-        getLatest(model_id);
+        getLatest(MODEL_ID);
         
     }
 
@@ -140,11 +139,10 @@ async function getLatest(model_id) {
 
      // send the query proposal to the peer
      let response = await channel.queryByChaincode(request);
-     console.log(response); //needs parsing into a JSON structure
-     
+     console.log(response.toString());
+
     return 
 }
-
 
 function setupTxListener(tx_id_string) {
     let event_hub = channel.getChannelEventHub(PEER_NAME);
@@ -199,7 +197,7 @@ async function setupClient() {
 
     await client.initCredentialStores()
         .then((done) => {
-            console.log("initCredentialStore(): ", done)
+            //console.log("initCredentialStore(): ", done)
         })
 
     let userContext = await client.loadUserFromStateStore(USER_NAME)
@@ -233,3 +231,4 @@ function generateBase64String(length) {
     }
     return result;
 }
+
