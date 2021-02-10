@@ -25,7 +25,7 @@ if (ORG_NAME === 'org1') {
 }
 
 
-const CRYPTO_CONFIG = path.resolve(__dirname, '../../network/organizations');
+const CRYPTO_CONFIG = path.resolve(__dirname, '../network/organizations');
 const CRYPTO_CONFIG_PEER_ORGANIZATIONS = path.join(CRYPTO_CONFIG, 'peerOrganizations')
 
 const client = Client.loadFromConfig(CONNECTION_PROFILE_PATH)

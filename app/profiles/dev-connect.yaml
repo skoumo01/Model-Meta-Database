@@ -23,28 +23,13 @@ organizations:
     peers:
       -peer0.org1.example.com
       -peer1.org1.example.com
-      # -peer2.org1.example.com
-      # -peer3.org1.example.com
-      # -peer4.org1.example.com
-      # -peer5.org1.example.com
-      # -peer6.org1.example.com
-      # -peer7.org1.example.com
-      # -peer8.org1.example.com
-      # -peer9.org1.example.com
 
   Org2:
     mspid: Org2MSP
     peers:
       -peer0.org2.example.com
       -peer1.org2.example.com
-      # -peer2.org2.example.com
-      # -peer3.org2.example.com
-      # -peer4.org2.example.com
-      # -peer5.org2.example.com
-      # -peer6.org2.example.com
-      # -peer7.org2.example.com
-      # -peer8.org2.example.com
-      # -peer9.org2.example.com
+
 
 #
 # [Optional]. But most apps would have this section so that channel objects can be constructed
@@ -65,42 +50,6 @@ channels:
         endorsingPeer: true
       peer1.org1.example.com:
         endorsingPeer: true
-      # peer2.org1.example.com:
-      #   endorsingPeer: true
-      # peer3.org1.example.com:
-      #   endorsingPeer: true
-      # peer4.org1.example.com:
-      #   endorsingPeer: true
-      # peer5.org1.example.com:
-      #   endorsingPeer: true
-      # peer6.org1.example.com:
-      #   endorsingPeer: true
-      # peer7.org1.example.com:
-      #   endorsingPeer: true
-      # peer8.org1.example.com:
-      #   endorsingPeer: true
-      # peer9.org1.example.com:
-      #   endorsingPeer: true
-      peer0.org2.example.com:
-        endorsingPeer: true
-      peer1.org2.example.com:
-        endorsingPeer: true
-      # peer2.org2.example.com:
-      #   endorsingPeer: true
-      # peer3.org2.example.com:
-      #   endorsingPeer: true
-      # peer4.org2.example.com:
-      #   endorsingPeer: true
-      # peer5.org2.example.com:
-      #   endorsingPeer: true
-      # peer6.org2.example.com:
-      #   endorsingPeer: true
-      # peer7.org2.example.com:
-      #   endorsingPeer: true
-      # peer8.org2.example.com:
-      #   endorsingPeer: true
-      # peer9.org2.example.com:
-      #   endorsingPeer: true
 
 #
 # List of orderers to send transaction and channel create/update requests to. For the time
@@ -115,7 +64,7 @@ orderers:
     grpcOptions:
       ssl-target-name-override: orderer.example.com
     tlsCACerts:
-      path: ../../network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+      path: ../network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
 
 #
 # List of peers to send various requests to, including endorsement, query
@@ -127,23 +76,23 @@ peers:
     grpcOptions:
       ssl-target-name-override: peer0.org1.example.com
     tlsCACerts:
-      path: ../../network/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/msp/tlscacerts/tlsca.org1.example.com-cert.pem
+      path: ../network/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/msp/tlscacerts/tlsca.org1.example.com-cert.pem
   peer1.org1.example.com:
     url: grpcs://localhost:8051
     grpcOptions:
       ssl-target-name-override: peer1.org1.example.com
     tlsCACerts:
-      path: ../../network/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/msp/tlscacerts/tlsca.org1.example.com-cert.pem
+      path: ../network/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/msp/tlscacerts/tlsca.org1.example.com-cert.pem
 
   peer0.org2.example.com:
     url: grpcs://localhost:9051
     grpcOptions:
       ssl-target-name-override: peer0.org2.example.com
     tlsCACerts:
-      path: ../../network/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/msp/tlscacerts/tlsca.org2.example.com-cert.pem
+      path: ../network/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/msp/tlscacerts/tlsca.org2.example.com-cert.pem
   peer1.org2.example.com:
     url: grpcs://localhost:10051
     grpcOptions:
       ssl-target-name-override: peer1.org2.example.com
     tlsCACerts:
-      path: ../../network/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/msp/tlscacerts/tlsca.org2.example.com-cert.pem
+      path: ../network/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/msp/tlscacerts/tlsca.org2.example.com-cert.pem

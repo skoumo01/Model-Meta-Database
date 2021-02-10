@@ -3,7 +3,7 @@ const Client = require('fabric-client');
 const { exit } = require('process');
 
 var myArgs = process.argv.slice(2);
-//node test_models.js org1 Admin peer0.org1.example.com mychannel contract_models 1 createModel id_0 model_str
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models 1 createModel id_0 model_str
 
 // Arguments Parcing
 const ORG_NAME = myArgs[0];
@@ -91,38 +91,46 @@ async function createModel(tx_data) {
 
     
     console.log("#1 channel.sendTransactionProposal     Done.")
-    let results = await channel.sendTransactionProposal(request);
+    try{
+        let results = await channel.sendTransactionProposal(request);
+        
+        // Array of proposal responses
+        var proposalResponses = results[0];
 
-    // Array of proposal responses
-    var proposalResponses = results[0];
+        var proposal = results[1];
 
-    var proposal = results[1];
-
-    var all_good = true;
-    for (var i in proposalResponses) {
-        let good = false
-        if (proposalResponses && proposalResponses[i].response &&
-            proposalResponses[i].response.status === 200) {
-            good = true;
-            console.log(`\tinvoke chaincode EP response #${i} was good`);
-        } else {
-            console.log(`\tinvoke chaincode EP response #${i} was bad!!!`);
+        var all_good = true;
+        for (var i in proposalResponses) {
+            let good = false
+            if (proposalResponses && proposalResponses[i].response &&
+                proposalResponses[i].response.status === 200) {
+                good = true;
+                console.log(`\tinvoke chaincode EP response #${i} was good`);
+            } else {
+                console.log(`\tinvoke chaincode EP response #${i} was bad!!!`);
+            }
+            all_good = all_good & good
         }
-        all_good = all_good & good
+        console.log("#2 Looped through the EP results  all_good=", all_good)
+
+        await setupTxListener(tx_id_string)
+        console.log('#3 Registered the Tx Listener')
+
+        var orderer_request = {
+            txId: tx_id,
+            proposalResponses: proposalResponses,
+            proposal: proposal
+        };
+
+        await channel.sendTransaction(orderer_request);
+        console.log("#4 channel.sendTransaction - waiting for Tx Event")
+
+    }catch{
+        console.log('(Error: Failed to complete the transaction lifecycle procedure. '+
+                        'Please ensure that the provided connection data is valid.')
+        exit(0);
     }
-    console.log("#2 Looped through the EP results  all_good=", all_good)
-
-    await setupTxListener(tx_id_string)
-    console.log('#3 Registered the Tx Listener')
-
-    var orderer_request = {
-        txId: tx_id,
-        proposalResponses: proposalResponses,
-        proposal: proposal
-    };
-
-    await channel.sendTransaction(orderer_request);
-    console.log("#4 channel.sendTransaction - waiting for Tx Event")
+    
 
 }
 
@@ -138,55 +146,66 @@ async function getLatest(model_id) {
      };
 
      // send the query proposal to the peer
-     let response = await channel.queryByChaincode(request);
-     console.log(response.toString());
+     try {
+        let response = await channel.queryByChaincode(request);
+        var not_found_catch = JSON.parse(response);
+        console.log(response.toString());
+     }catch{
+        throw new Error('Error: error in simulation: transaction returned with failure: Error: The Model ' + model_id + ' does not exist');
+     }
+     
 
     return 
 }
 
 function setupTxListener(tx_id_string) {
-    let event_hub = channel.getChannelEventHub(PEER_NAME);
 
-    event_hub.registerTxEvent(tx_id_string, (tx, code, block_num) => {
-        
-        console.log("#5 Received Tx Event")
-        console.log('\tThe chaincode invoke chaincode transaction has been committed on peer %s', event_hub.getPeerAddr());
-        console.log('\tTransaction %s is in block %s', tx, block_num);
-        
+    try{
+        let event_hub = channel.getChannelEventHub(PEER_NAME);
 
-        if (code !== 'VALID') {
-            console.log('\tThe invoke chaincode transaction was invalid, code:%s', code);
-        } else {
-            console.log('\tThe invoke chaincode transaction was VALID.');
-        }
-        hrend.push(process.hrtime(hrstart[commitedTxs]));
-        commitedTxs++;
-        if (commitedTxs === NUMBER_OF_TXS) {
-            var final_timer = process.hrtime(initial_timer);
-            console.log("\t\t", final_timer);
-            for (var timer of hrend) {
-                total_time.push(timer[0] * 1000 + timer[1] / 1000000);
+        event_hub.registerTxEvent(tx_id_string, (tx, code, block_num) => {
+            
+            console.log("#5 Received Tx Event")
+            console.log('\tThe chaincode invoke chaincode transaction has been committed on peer %s', event_hub.getPeerAddr());
+            console.log('\tTransaction %s is in block %s', tx, block_num);
+            
+
+            if (code !== 'VALID') {
+                console.log('\tThe invoke chaincode transaction was invalid, code:%s', code);
+            } else {
+                console.log('\tThe invoke chaincode transaction was VALID.');
             }
+            hrend.push(process.hrtime(hrstart[commitedTxs]));
+            commitedTxs++;
+            if (commitedTxs === NUMBER_OF_TXS) {
+                var final_timer = process.hrtime(initial_timer);
+                console.log("\t\t", final_timer);
+                for (var timer of hrend) {
+                    total_time.push(timer[0] * 1000 + timer[1] / 1000000);
+                }
 
-            var sum = total_time.reduce((acc, c) => acc + c, 0);
-            var average = sum / NUMBER_OF_TXS;
-            
-            
-            console.log("\t\tAverage Latency to commit a Tx =  %d ms", average);
-            console.log("\t\tSubmited Txs = ", commitedTxs);
-            
-            exit(0);
-        }
-
-    },
-        // 3. Callback for errors
-        (err) => {
-            console.log(err);
+                var sum = total_time.reduce((acc, c) => acc + c, 0);
+                var average = sum / NUMBER_OF_TXS;
+                
+                
+                console.log("\t\tAverage Latency to commit a Tx =  %d ms", average);
+                console.log("\t\tSubmited Txs = ", commitedTxs);
+                
+                exit(0);
+            }
+          
         },
-        { unregister: true, disconnect: false }
-    );
+            // 3. Callback for errors
+            (err) => {
+                console.log(err);
+            },
+            { unregister: true, disconnect: false }
+        );
 
-    event_hub.connect();
+        event_hub.connect();
+    }catch{
+        throw new Error('Listener Error.')
+    }
 }
 
 async function setupClient() {
