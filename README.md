@@ -5,6 +5,7 @@ This repository implements a meta-database intented for model storing and queryi
 The meta-database consists of mainly two layers: a NodeJS RESTful service layer (Layer 1) and a Hyperledger Fabric blockchain layer (Layer 2). Layer 1 is used as the database's interface through which clients can submit their query requests. Layer 2 takes care of both the storage and the indexing of the models on the blockchain's peer nodes, using Hyperledger Fabric's concepts and regulations.
 
 The following diagram depicts the different components of the meta-database:
+
 ![model-meta-database-architecture](https://i.imgur.com/duoaoEs.png)
 
 
