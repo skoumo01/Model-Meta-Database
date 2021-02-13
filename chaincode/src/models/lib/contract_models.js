@@ -9,9 +9,9 @@ class contract_models extends Contract {
         
     }
 
-    // createModel creates a new ledger entry for the received model.
+    // submitModelEntry creates or updates a ledger entry for the received model.
     // This corresponds to the model's v1.
-    async createModelEntry(ctx, timestamp, model_id, serialized_model) {
+    async submitModelEntry(ctx, timestamp, model_id, serialized_model) {
 
         const Model_Data = {
             timestamp: timestamp,

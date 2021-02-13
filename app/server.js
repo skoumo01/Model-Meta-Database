@@ -18,14 +18,7 @@ var transactionNumber = 1;
 app.use(express.json()) // for parsing application/json
 app.use(express.urlencoded({ extended: true })) // for parsing application/x-www-form-urlencoded
 
-
-//curl --location --request POST '10.16.30.89:3000/create' 
-//--header 'Content-Type: application/json' \
-//--data-raw '{
-//    "model_id": "id_0",
-//    "serialized_model": "serialized model no.0"
-//}'
-app.post('/create', function (req, res, next) {
+function submitModel(req, res, next) {
 
     if (!req.body.hasOwnProperty('model_id')){
         res.status(400).send('Bad Request Error: Property "model_id" is missing from request body.');
@@ -36,7 +29,7 @@ app.post('/create', function (req, res, next) {
         return
     }
 
-    var opName = 'createModel';
+    var opName = 'submitModel';
     var child = execFile('node', ['run_models.js', org, user, peerName, channel, contract, transactionNumber, opName, req.body.model_id, req.body.serialized_model], (error, stdout, stderr) => {
         if (error) {
             console.log('Child process error.');
@@ -46,15 +39,38 @@ app.post('/create', function (req, res, next) {
         if (stdout.includes('Error')) {
             let msg = stdout.split('(')[1].trim();
             console.log('Blockchain error: ' + msg);
-            res.status(400).send('Bad Request:' + msg);
+            res.status(400).send('Bad Request: ' + msg);
             return
         }
         res.status(201).send(stdout);
     });
-})
+}
+
+/*
+curl --location --request POST '10.16.30.89:3000/create' 
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "model_id": "id_0",
+    "serialized_model": "dummy string 0 #1"
+}'
+*/
+app.post('/create', submitModel);
 
 
-//curl --location --request GET '10.16.30.89:3000/latest?id=id_0'
+/*
+curl --location --request PUT '10.16.30.89:3000/update' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "model_id": "id_0",
+    "serialized_model": "dummy string 0 #2"
+}'
+*/
+app.put('/update', submitModel);
+
+
+/*
+curl --location --request GET '10.16.30.89:3000/latest?id=id_0'
+*/
 app.get("/latest", (req, res, next) => {
     if (req.query.hasOwnProperty('id')) {
         var opName = 'getLatest';
@@ -75,7 +91,6 @@ app.get("/latest", (req, res, next) => {
         });
     }
 });
-
 
 
 

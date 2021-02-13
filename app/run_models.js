@@ -3,7 +3,7 @@ const Client = require('fabric-client');
 const { exit } = require('process');
 
 var myArgs = process.argv.slice(2);
-//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models 1 createModel id_0 model_str
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models 1 submitModel id_0 model_str
 
 // Arguments Parcing
 const ORG_NAME = myArgs[0];
@@ -12,7 +12,7 @@ const PEER_NAME = myArgs[2];
 const CHANNEL_NAME = myArgs[3];
 const CHAINCODE_ID = myArgs[4];
 const NUMBER_OF_TXS = parseInt(myArgs[5]);
-const FUNCTION_CALL = myArgs[6]; // "createModel"/"getLatest"
+const FUNCTION_CALL = myArgs[6]; // "submitModel"/"getLatest"
 const MODEL_ID = myArgs[7];
 const MODEL_STR = myArgs[8];
 
@@ -53,14 +53,14 @@ async function main() {
 
     channel = await setupChannel();
 
-    if (FUNCTION_CALL==='createModel'){
+    if (FUNCTION_CALL==='submitModel'){
         //generate pseudo model data
         var Tx = {};
         Tx.model_id = MODEL_ID;
         Tx.serialized_model = MODEL_STR; //generateBase64String(4688);
         
         //simple POST
-        createModel(Tx);
+        submitModel(Tx);
 
     }else if (FUNCTION_CALL==='getLatest'){
         //simple GET
@@ -70,7 +70,7 @@ async function main() {
 
 }
 
-async function createModel(tx_data) {
+async function submitModel(tx_data) {
 
     let peerName = channel.getChannelPeer(PEER_NAME)
 
@@ -81,7 +81,7 @@ async function createModel(tx_data) {
     var request = {
         targets: peerName,
         chaincodeId: CHAINCODE_ID,
-        fcn: 'createModelEntry',
+        fcn: 'submitModelEntry',
         args: [millis, tx_data.model_id, tx_data.serialized_model],
         chainId: CHANNEL_NAME,
         txId: tx_id
