@@ -93,6 +93,60 @@ app.get("/latest", (req, res, next) => {
 });
 
 
+app.get("/history", (req, res, next) => {
+
+    if (!req.query.hasOwnProperty('id')){
+        res.status(400).send('Bad Request Error: Property "id" is missing from request body.');
+        return
+    }
+    if (!req.query.hasOwnProperty('bounded')){
+        res.status(400).send('Bad Request Error: Property "bounded" is missing from request body.');
+        return
+    }
+    
+    var id = req.query.id;
+    var bounded = req.query.bounded;
+    if (!(bounded === 'true') && !(bounded === 'false')){
+        res.status(400).send('Bad Request Error: Invalid assignment to property "bounded".\nMust provide "true" or "false".');
+        return
+    }
+
+    var min = "";
+    var max = "";
+    if (bounded === 'true'){
+        if (!req.query.hasOwnProperty('min') || !req.query.hasOwnProperty('max')){
+            res.status(400).send('Bad Request Error: Properties "min" and/or "max" is missing from request body.');
+            return
+        }
+        var min = req.query.min;
+        var max = req.query.max;
+        if (isNaN(min) || isNaN(max) || (parseInt(max, 10) < parseInt(min, 10)) || (parseInt(max, 10) <= 0) || (parseInt(min, 10) <= 0)){
+            res.status(400).send('Bad Request Error: Invalid assignment to property "min" and/or "max".\nMust provide a timestamp with an accuracy of seconds.');
+            return
+        }
+    }
+    
+    var opName = 'getHistory';
+    var child = execFile('node', ['run_models.js', org, user, peerName, channel, contract, transactionNumber, opName, id, bounded, min, max], (error, stdout, stderr) => {
+        if (error) {
+            console.log('Child process error.');
+            res.status(500).send('Internal Server Error: Failed to retrieve model ' + req.query.id + '.');
+            return 
+        }
+        if (stderr) {
+            let msg = stderr.split('(')[1].split(')')[1].replace('at getHistory', ' ').trim();
+            console.log('Blockchain error: ' + msg);
+            res.status(404).send('Bad Request:' + msg);
+            return 
+        }
+        var history = JSON.parse(stdout);
+        res.status(200).send(history);
+    });
+
+});
+
+
+
 
 async function main() {
 

@@ -4,17 +4,33 @@ const { exit } = require('process');
 
 var myArgs = process.argv.slice(2);
 //node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models 1 submitModel id_0 model_str
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models 1 getLatest id_1
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models 1 getHistory id_0 false 1613556418 1613556450
 
-// Arguments Parcing
+// Argument Parcing
 const ORG_NAME = myArgs[0];
 const USER_NAME = myArgs[1];
 const PEER_NAME = myArgs[2];
 const CHANNEL_NAME = myArgs[3];
 const CHAINCODE_ID = myArgs[4];
 const NUMBER_OF_TXS = parseInt(myArgs[5]);
-const FUNCTION_CALL = myArgs[6]; // "submitModel"/"getLatest"
-const MODEL_ID = myArgs[7];
-const MODEL_STR = myArgs[8];
+const FUNCTION_CALL = myArgs[6]; // "submitModel"/"getLatest"/"getHistory"
+var MODEL_ID = "";    
+var MODEL_STR = "";
+var IS_BOUNDED = "";
+var MIN_TIMESTAMP = "";
+var MAX_TIMESTAMP = "";
+if (FUNCTION_CALL==='submitModel'){
+    MODEL_ID = myArgs[7];    
+    MODEL_STR = myArgs[8];
+}else if (FUNCTION_CALL==='getLatest'){
+    MODEL_ID = myArgs[7];
+}else if (FUNCTION_CALL==='getHistory'){
+    MODEL_ID = myArgs[7];
+    IS_BOUNDED = myArgs[8]; // "true"/"false"
+    MIN_TIMESTAMP = myArgs[9];
+    MAX_TIMESTAMP = myArgs[10];
+}
 
 // Constants for profile
 const CONNECTION_PROFILE_PATH = './profiles/dev-connect.yaml';
@@ -66,6 +82,9 @@ async function main() {
         //simple GET
         getLatest(MODEL_ID);
         
+    }else if (FUNCTION_CALL==='getHistory'){
+        //retieves (un)bounded model history (i.e. submitted versions)
+        getHistory(MODEL_ID, IS_BOUNDED, MIN_TIMESTAMP, MAX_TIMESTAMP);
     }
 
 }
@@ -157,6 +176,29 @@ async function getLatest(model_id) {
 
     return 
 }
+
+async function getHistory(model_id, is_bounded, min_timestamp, max_timestamp) {
+
+    let peerName = channel.getChannelPeer(PEER_NAME)
+
+    let request = {
+         targets: peerName,
+         chaincodeId: CHAINCODE_ID,
+         fcn: 'getVersionRange',
+         args: [model_id, is_bounded, min_timestamp, max_timestamp]
+     };
+
+     // send the query proposal to the peer
+    let response = await channel.queryByChaincode(request);
+    if (response.toString() === 'false'){
+        throw new Error('Error: error in simulation: transaction returned with failure: Error: The Model ' + model_id + ' does not exist');
+    }else{
+        console.log(response.toString());
+    }
+
+    return 
+}
+
 
 function setupTxListener(tx_id_string) {
 

@@ -46,11 +46,12 @@ history(){
     -n ${CC_NAME}  \
     --peerAddresses localhost:7051 --tlsRootCertFiles $PEER0_ORG1_CA \
     --peerAddresses localhost:9051 --tlsRootCertFiles $PEER0_ORG2_CA \
-    -c '{"function": "getVersionRange","Args": ["id_0", "true", "1613232806", "1613232839"]}'
+    -c '{"function": "getVersionRange","Args": ["id_0", "false", "1613556383", "1613556427"]}'
 }
+
 
 model=$(<./scripts/testChaincode_data/model_base64)
 
 #submit
 #latest
-#history
+history
