@@ -3,9 +3,9 @@ const Client = require('fabric-client');
 const { exit } = require('process');
 
 var myArgs = process.argv.slice(2);
-//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models 1 submitModel id_0 model_str
-//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models 1 getLatest id_1
-//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models 1 getHistory id_0 false 1613556418 1613556450
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models submitModel id_0 model_str
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getLatest id_1
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getHistory id_0 false 1613556418 1613556450
 
 // Argument Parcing
 const ORG_NAME = myArgs[0];
@@ -13,23 +13,22 @@ const USER_NAME = myArgs[1];
 const PEER_NAME = myArgs[2];
 const CHANNEL_NAME = myArgs[3];
 const CHAINCODE_ID = myArgs[4];
-const NUMBER_OF_TXS = parseInt(myArgs[5]);
-const FUNCTION_CALL = myArgs[6]; // "submitModel"/"getLatest"/"getHistory"
+const FUNCTION_CALL = myArgs[5]; // "submitModel"/"getLatest"/"getHistory"
 var MODEL_ID = "";    
 var MODEL_STR = "";
 var IS_BOUNDED = "";
 var MIN_TIMESTAMP = "";
 var MAX_TIMESTAMP = "";
 if (FUNCTION_CALL==='submitModel'){
-    MODEL_ID = myArgs[7];    
-    MODEL_STR = myArgs[8];
+    MODEL_ID = myArgs[6];    
+    MODEL_STR = myArgs[7];
 }else if (FUNCTION_CALL==='getLatest'){
-    MODEL_ID = myArgs[7];
+    MODEL_ID = myArgs[6];
 }else if (FUNCTION_CALL==='getHistory'){
-    MODEL_ID = myArgs[7];
-    IS_BOUNDED = myArgs[8]; // "true"/"false"
-    MIN_TIMESTAMP = myArgs[9];
-    MAX_TIMESTAMP = myArgs[10];
+    MODEL_ID = myArgs[6];
+    IS_BOUNDED = myArgs[7]; // "true"/"false"
+    MIN_TIMESTAMP = myArgs[8];
+    MAX_TIMESTAMP = myArgs[9];
 }
 
 // Constants for profile
@@ -95,13 +94,12 @@ async function submitModel(tx_data) {
 
     var tx_id = client.newTransactionID();
     let tx_id_string = tx_id.getTransactionID();
-    const millis = (Date.now()).toString();
-
+    
     var request = {
         targets: peerName,
         chaincodeId: CHAINCODE_ID,
         fcn: 'submitModelEntry',
-        args: [millis, tx_data.model_id, tx_data.serialized_model],
+        args: [tx_data.model_id, tx_data.serialized_model],
         chainId: CHANNEL_NAME,
         txId: tx_id
     };
@@ -109,7 +107,7 @@ async function submitModel(tx_data) {
     hrstart.push(process.hrtime());
 
     
-    console.log("#1 channel.sendTransactionProposal     Done.")
+    //console.log("#1 Transaction proposal successfully sent to channel.")
     try{
         let results = await channel.sendTransactionProposal(request);
         
@@ -124,16 +122,16 @@ async function submitModel(tx_data) {
             if (proposalResponses && proposalResponses[i].response &&
                 proposalResponses[i].response.status === 200) {
                 good = true;
-                console.log(`\tinvoke chaincode EP response #${i} was good`);
+                //console.log(`\tChaincode invocation proposal response #${i} was good`);
             } else {
-                console.log(`\tinvoke chaincode EP response #${i} was bad!!!`);
+                //console.log(`\tChaincode invocation proposal response #${i} was bad!`);
             }
             all_good = all_good & good
         }
-        console.log("#2 Looped through the EP results  all_good=", all_good)
+        //console.log("#2 Looped through the proposal responses all_good=", all_good)
 
-        await setupTxListener(tx_id_string)
-        console.log('#3 Registered the Tx Listener')
+        //await setupTxListener(tx_id_string)
+        //console.log('#3 Registered the Tx Listener')
 
         var orderer_request = {
             txId: tx_id,
@@ -142,11 +140,11 @@ async function submitModel(tx_data) {
         };
 
         await channel.sendTransaction(orderer_request);
-        console.log("#4 channel.sendTransaction - waiting for Tx Event")
+        //console.log("#3 Transaction has been submitted.")
 
     }catch{
-        console.log('(Error: Failed to complete the transaction lifecycle procedure. '+
-                        'Please ensure that the provided connection data is valid.')
+        //console.log('(Error: Failed to complete the transaction lifecycle procedure. '+
+         //               'Please ensure that the provided connection data is valid.')
         exit(0);
     }
     
@@ -200,7 +198,57 @@ async function getHistory(model_id, is_bounded, min_timestamp, max_timestamp) {
 }
 
 
-function setupTxListener(tx_id_string) {
+async function setupClient() {
+
+    const client = Client.loadFromConfig(CONNECTION_PROFILE_PATH)
+
+    client.loadFromConfig(CLIENT_CONNECTION_PROFILE_PATH)
+
+    await client.initCredentialStores()
+        .then((done) => {
+            //console.log("initCredentialStore(): ", done)
+        })
+
+    let userContext = await client.loadUserFromStateStore(USER_NAME)
+    if (userContext == null) {
+        //console.log("User NOT found in credstore: ", USER_NAME)
+        process.exit(1)
+    }
+
+    client.setUserContext(userContext, true)
+
+    return client
+}
+
+async function setupChannel() {
+
+    
+    try {
+        // for debugging
+        //console.log(await client.queryChannels(PEER_NAME,true))
+
+        channel = await client.getChannel(CHANNEL_NAME, true)
+    } catch (e) {
+        console.log("Could NOT create channel: ", CHANNEL_NAME)
+        process.exit(1)
+    }
+
+    return channel
+}
+
+
+// for testing
+/*function generateBase64String(length) {
+    var result = '';
+    var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    var charactersLength = characters.length;
+    for (var i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
+}*/
+
+/*function setupTxListener(tx_id_string) {
 
     try{
         let event_hub = channel.getChannelEventHub(PEER_NAME);
@@ -248,48 +296,6 @@ function setupTxListener(tx_id_string) {
     }catch{
         throw new Error('Listener Error.')
     }
-}
+}*/
 
-async function setupClient() {
-
-    const client = Client.loadFromConfig(CONNECTION_PROFILE_PATH)
-
-    client.loadFromConfig(CLIENT_CONNECTION_PROFILE_PATH)
-
-    await client.initCredentialStores()
-        .then((done) => {
-            //console.log("initCredentialStore(): ", done)
-        })
-
-    let userContext = await client.loadUserFromStateStore(USER_NAME)
-    if (userContext == null) {
-        console.log("User NOT found in credstore: ", USER_NAME)
-        process.exit(1)
-    }
-
-    client.setUserContext(userContext, true)
-
-    return client
-}
-
-async function setupChannel() {
-    try {
-        channel = await client.getChannel(CHANNEL_NAME, true)
-    } catch (e) {
-        console.log("Could NOT create channel: ", CHANNEL_NAME)
-        process.exit(1)
-    }
-
-    return channel
-}
-
-function generateBase64String(length) {
-    var result = '';
-    var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    var charactersLength = characters.length;
-    for (var i = 0; i < length; i++) {
-        result += characters.charAt(Math.floor(Math.random() * charactersLength));
-    }
-    return result;
-}
 

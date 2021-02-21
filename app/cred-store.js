@@ -64,7 +64,7 @@ async function main() {
 
         console.log(`Created ${user} under the credentials store!!`)
     } else {
-        console.log(`User ${user} already exist!!`)
+        console.log(`User ${user} already exists!!`)
     }
 
     // Setup the context on the client

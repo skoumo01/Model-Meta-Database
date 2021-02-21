@@ -11,10 +11,9 @@ class contract_models extends Contract {
 
     // submitModelEntry creates or updates a ledger entry for the received model.
     // This corresponds to the model's v1.
-    async submitModelEntry(ctx, timestamp, model_id, serialized_model) {
+    async submitModelEntry(ctx, model_id, serialized_model) {
 
         const Model_Data = {
-            timestamp: timestamp,
             serialized_model: serialized_model,
         };
 
@@ -128,7 +127,7 @@ class contract_models extends Contract {
                         }   
                     }
 					try {
-						jsonRes.Serialized_model = JSON.parse(res.value.value.toString('utf8')).serialized_model;
+						jsonRes.Value = JSON.parse(res.value.value.toString('utf8'));
 					} catch (err) {
 						console.log(err);
 						jsonRes.Value = res.value.value.toString('utf8');

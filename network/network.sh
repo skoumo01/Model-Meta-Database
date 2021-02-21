@@ -9,7 +9,7 @@ function printHelp() {
     println "Usage: "
     println "  network.sh <Mode> [Flags]"
     println "    Modes:"
-    println "      \033[0;32mup\033[0m - bring up fabric orderer and peer nodes. After that create and join a channe;"
+    println "      \033[0;32mup\033[0m - bring up fabric orderer and peer nodes. After that create and join a channel"
     println "      \033[0;32mdown\033[0m - shut down all fabric services and erase channel artifacts"
     println "      \033[0;32mdeployCC\033[0m - deploy a specified chaincode according to the input flags"
     println
