@@ -29,6 +29,8 @@ curl --location --request PUT '10.16.30.89:3000/submit' \
     "contract": "contract_models",
     "model": {
         "id": "id_0",
+        "tag1": "tag1",
+        "tag2": "tag2",
         "serialized_data": "dummy string 0"
     }
 }'
@@ -63,8 +65,10 @@ app.put('/submit', (req, res, next) => {
     if (!req.body.hasOwnProperty('model')){
         res.status(400).send('Bad Request Error: Property "model_id" is missing from request body.');
         return
-    }else if (!req.body.model.hasOwnProperty('id') || !req.body.model.hasOwnProperty('serialized_data')){
-        res.status(400).send('Bad Request Error: Model property "id" and/or "serialized_data" is missing from request body.');
+    }else if (!req.body.model.hasOwnProperty('id') || !req.body.model.hasOwnProperty('tag1')
+            || !req.body.model.hasOwnProperty('tag2') || !req.body.model.hasOwnProperty('serialized_data')){
+        res.status(400).send('Bad Request Error: One of the following model properties is missing from the request body'+
+                                ': "id", "tag1", "tag2", "serialized_data".');
         return
     }
 
@@ -78,7 +82,8 @@ app.put('/submit', (req, res, next) => {
 
     var child = execFile('node', ['run_models.js', req.body.organization, req.body.user, 
                             req.body.peername, req.body.channel, req.body.contract, opName,
-                            req.body.model.id, req.body.model.serialized_data], (error, stdout, stderr) => {
+                            req.body.model.id, req.body.model.tag1, req.body.model.tag2,
+                             req.body.model.serialized_data], (error, stdout, stderr) => {
         if (error) {
             console.log('Child process error.');
             channel_map.get(req.body.channel).set(req.body.model.id, {is_completed: 'false', status: 'ERROR'});

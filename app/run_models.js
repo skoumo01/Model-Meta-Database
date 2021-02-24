@@ -3,7 +3,7 @@ const Client = require('fabric-client');
 const { exit } = require('process');
 
 var myArgs = process.argv.slice(2);
-//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models submitModel id_0 model_str
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models submitModel id_0 tag1 tag2 model_str
 //node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getLatest id_1
 //node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getHistory id_0 false 1613556418 1613556450
 
@@ -15,13 +15,17 @@ const CHANNEL_NAME = myArgs[3];
 const CHAINCODE_ID = myArgs[4];
 const FUNCTION_CALL = myArgs[5]; // "submitModel"/"getLatest"/"getHistory"
 var MODEL_ID = "";    
+var TAG1 = "";
+var TAG2 = "";
 var MODEL_STR = "";
 var IS_BOUNDED = "";
 var MIN_TIMESTAMP = "";
 var MAX_TIMESTAMP = "";
 if (FUNCTION_CALL==='submitModel'){
     MODEL_ID = myArgs[6];    
-    MODEL_STR = myArgs[7];
+    TAG1 = myArgs[7];    
+    TAG2 = myArgs[8];    
+    MODEL_STR = myArgs[9];
 }else if (FUNCTION_CALL==='getLatest'){
     MODEL_ID = myArgs[6];
 }else if (FUNCTION_CALL==='getHistory'){
@@ -65,6 +69,8 @@ async function main() {
         //generate pseudo model data
         var Tx = {};
         Tx.model_id = MODEL_ID;
+        Tx.tag1 = TAG1;
+        Tx.tag2 = TAG2;
         Tx.serialized_model = MODEL_STR; //generateBase64String(4688);
         
         //simple POST
@@ -92,8 +98,8 @@ async function submitModel(tx_data) {
     var request = {
         targets: peerName,
         chaincodeId: CHAINCODE_ID,
-        fcn: 'submitModelEntry',
-        args: [tx_data.model_id, tx_data.serialized_model],
+        fcn: 'SubmitModelEntry',
+        args: [tx_data.model_id, tx_data.tag1, tx_data.tag2, tx_data.serialized_model],
         chainId: CHANNEL_NAME,
         txId: tx_id
     };
@@ -150,7 +156,7 @@ async function getLatest(model_id) {
     let request = {
          targets: peerName,
          chaincodeId: CHAINCODE_ID,
-         fcn: 'getLatestVersion',
+         fcn: 'GetLatestVersion',
          args: [model_id]
      };
 
@@ -174,7 +180,7 @@ async function getHistory(model_id, is_bounded, min_timestamp, max_timestamp) {
     let request = {
          targets: peerName,
          chaincodeId: CHAINCODE_ID,
-         fcn: 'getVersionRange',
+         fcn: 'GetVersionRange',
          args: [model_id, is_bounded, min_timestamp, max_timestamp]
      };
 
