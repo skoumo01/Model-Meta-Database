@@ -10,10 +10,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "express": "^4.0.0",
     "fabric-client": "^1.4.0",
     "fabric-network": "^1.4.0",
     "fs": "0.0.1-security",
-    "path": "^0.12.7",
-    "express": "^4.0.0"
+    "hashmap": "^2.4.0",
+    "path": "^0.12.7"
   }
 }

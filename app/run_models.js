@@ -45,18 +45,11 @@ if (ORG_NAME === 'org1') {
     exit(0);
 }
 
-//global counter 
-var commitedTxs = 0;
 
 // Variable to hold the client
 var client = {}
 // Variable to hold the channel
 var channel = {}
-
-var initial_timer;
-var hrstart = [];
-var hrend = [];
-var total_time = [];
 
 if (require.main === module){
     main();
@@ -84,6 +77,7 @@ async function main() {
     }else if (FUNCTION_CALL==='getHistory'){
         //retieves (un)bounded model history (i.e. submitted versions)
         getHistory(MODEL_ID, IS_BOUNDED, MIN_TIMESTAMP, MAX_TIMESTAMP);
+
     }
 
 }
@@ -104,9 +98,7 @@ async function submitModel(tx_data) {
         txId: tx_id
     };
 
-    hrstart.push(process.hrtime());
 
-    
     //console.log("#1 Transaction proposal successfully sent to channel.")
     try{
         let results = await channel.sendTransactionProposal(request);
@@ -130,7 +122,7 @@ async function submitModel(tx_data) {
         }
         //console.log("#2 Looped through the proposal responses all_good=", all_good)
 
-        //await setupTxListener(tx_id_string)
+        await setupTxListener(tx_id_string)
         //console.log('#3 Registered the Tx Listener')
 
         var orderer_request = {
@@ -197,6 +189,44 @@ async function getHistory(model_id, is_bounded, min_timestamp, max_timestamp) {
     return 
 }
 
+async function setupTxListener(tx_id_string) {
+
+    try{
+        let event_hub = channel.getChannelEventHub(PEER_NAME);
+
+        event_hub.registerTxEvent(tx_id_string, (tx, code, block_num) => {
+            
+            var response = {};
+            response.tx_id = tx_id_string;
+            response.code = code;
+            response.status = 'VALID';          
+            response.blocknumber = block_num;
+        
+            //console.log("#5 Received Tx Event")
+            //console.log('The chaincode invoke chaincode transaction has been committed on peer %s', event_hub.getPeerAddr());
+            //console.log('Transaction %s is in block %s', tx, block_num);
+            
+            if (code !== 'VALID') {
+                response.status = 'INVALID';
+            }
+            
+            console.log(JSON.stringify(response));
+        },
+            // 3. Callback for errors
+            (err) => {
+                console.log(JSON.stringify({}));
+                //console.log(err);
+            },
+            { unregister: true, disconnect: true }
+        );
+
+        event_hub.connect();
+    }catch{
+        throw new Error('Listener Error.')
+    }
+}
+
+
 
 async function setupClient() {
 
@@ -236,7 +266,6 @@ async function setupChannel() {
     return channel
 }
 
-
 // for testing
 /*function generateBase64String(length) {
     var result = '';
@@ -247,55 +276,3 @@ async function setupChannel() {
     }
     return result;
 }*/
-
-/*function setupTxListener(tx_id_string) {
-
-    try{
-        let event_hub = channel.getChannelEventHub(PEER_NAME);
-
-        event_hub.registerTxEvent(tx_id_string, (tx, code, block_num) => {
-            
-            console.log("#5 Received Tx Event")
-            console.log('\tThe chaincode invoke chaincode transaction has been committed on peer %s', event_hub.getPeerAddr());
-            console.log('\tTransaction %s is in block %s', tx, block_num);
-            
-
-            if (code !== 'VALID') {
-                console.log('\tThe invoke chaincode transaction was invalid, code:%s', code);
-            } else {
-                console.log('\tThe invoke chaincode transaction was VALID.');
-            }
-            hrend.push(process.hrtime(hrstart[commitedTxs]));
-            commitedTxs++;
-            if (commitedTxs === NUMBER_OF_TXS) {
-                var final_timer = process.hrtime(initial_timer);
-                console.log("\t\t", final_timer);
-                for (var timer of hrend) {
-                    total_time.push(timer[0] * 1000 + timer[1] / 1000000);
-                }
-
-                var sum = total_time.reduce((acc, c) => acc + c, 0);
-                var average = sum / NUMBER_OF_TXS;
-                
-                
-                console.log("\t\tAverage Latency to commit a Tx =  %d ms", average);
-                console.log("\t\tSubmited Txs = ", commitedTxs);
-                
-                exit(0);
-            }
-          
-        },
-            // 3. Callback for errors
-            (err) => {
-                console.log(err);
-            },
-            { unregister: true, disconnect: false }
-        );
-
-        event_hub.connect();
-    }catch{
-        throw new Error('Listener Error.')
-    }
-}*/
-
-

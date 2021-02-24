@@ -18,8 +18,8 @@ submit() {
     -n ${CC_NAME}  \
     --peerAddresses localhost:7051 --tlsRootCertFiles $PEER0_ORG1_CA \
     --peerAddresses localhost:9051 --tlsRootCertFiles $PEER0_ORG2_CA \
-    -c '{"function": "submitModelEntry","Args": ["timestamp10", "id_1","model string 0"]}'
-    #-c '{"function": "submitModelEntry","Args": ["timestamp1", "id_0","'"$model"'"]}'
+    -c '{"function": "submitModelEntry","Args": ["id_1","model string 6"]}'
+    #-c '{"function": "submitModelEntry","Args": ["id_0","'"$model"'"]}'
     
 }
 
@@ -46,12 +46,12 @@ history(){
     -n ${CC_NAME}  \
     --peerAddresses localhost:7051 --tlsRootCertFiles $PEER0_ORG1_CA \
     --peerAddresses localhost:9051 --tlsRootCertFiles $PEER0_ORG2_CA \
-    -c '{"function": "getVersionRange","Args": ["id_1", "false", "1613556383", "1613556427"]}'
+    -c '{"function": "getVersionRange","Args": ["id_1", "true", "1614152891", "1614152900"]}'
 }
 
 
 model=$(<./scripts/testChaincode_data/model_base64)
 
-submit
+#submit
 #latest
-#history
+history

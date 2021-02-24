@@ -1,13 +1,10 @@
 'use strict';
-var express = require('express');
-var app = express(); //initalize express
-const { exit } = require('process');
+const express = require('express');
 const execFile = require('child_process').execFile;
-var fs = require("fs");
+const HashMap = require('hashmap');
 
-//var block = true;
-//function set_block(val){block = val;};
-
+var app = express();
+var channel_map = new HashMap();
 
 
 var channels = ['mychannel'];
@@ -72,23 +69,59 @@ app.put('/submit', (req, res, next) => {
     }
 
     var opName = 'submitModel';
+
+    if (!channel_map.has(req.body.channel)){
+        channel_map.set(req.body.channel, new HashMap());
+    }
+
+    channel_map.get(req.body.channel).set(req.body.model.id, {is_completed: 'false', status: 'PENDING'});
+
     var child = execFile('node', ['run_models.js', req.body.organization, req.body.user, 
                             req.body.peername, req.body.channel, req.body.contract, opName,
                             req.body.model.id, req.body.model.serialized_data], (error, stdout, stderr) => {
         if (error) {
             console.log('Child process error.');
-            res.status(500).send('Internal Server Error: Failed to commit the model on the blockchain.');
+            channel_map.get(req.body.channel).set(req.body.model.id, {is_completed: 'false', status: 'ERROR'});
             return
         }
-        if (stdout.includes('Error')) {
-            let msg = stdout.split('(')[1].trim();
-            console.log('Blockchain error: ' + msg);
-            res.status(400).send('Bad Request: ' + msg);
+        var response = JSON.parse(stdout);
+        if (!response.hasOwnProperty('status')){
+            channel_map.get(req.body.channel).set(req.body.model.id, {is_completed: 'false', status: 'ERROR'});
             return
         }
-        res.status(200).send(stdout);
+        channel_map.get(req.body.channel).set(req.body.model.id, {is_completed: 'true', status: response.status});
+
     });
+    res.status(200).send();
+    
 });
+
+/*
+curl --location --request GET '10.16.30.89:3000/check?channel=mychannel&id=id_0'
+*/
+app.get('/check', (req, res, next) => {
+
+    if (!req.query.hasOwnProperty('channel') || !channels.includes(req.query.channel)){
+        res.status(400).send('Bad Request Error: Ensure query parameter "channel" is provided and it '+
+                            'refers to an existing channel.');
+        return
+    }    
+    if (!req.query.hasOwnProperty('id')){
+        res.status(400).send('Bad Request Error: Ensure query parameter "id" is provided.');
+            return
+    }
+    
+    
+    if (!channel_map.has(req.query.channel) || !channel_map.get(req.query.channel).has(req.query.id)){
+        res.status(404).send('Not Found: Model with id "' + req.query.id + '" does not exist on channel "'
+                                + req.query.channel + '".');
+        return
+    }
+
+    res.status(200).send(channel_map.get(req.query.channel).get(req.query.id));
+});
+
+
 
 /*
 curl --location --request POST '10.16.30.89:3000/latest' \
@@ -156,6 +189,7 @@ app.post("/latest", (req, res, next) => {
     });
     
 });
+
 
 /*
 curl --location --request POST '10.16.30.89:3000/history' \
@@ -239,7 +273,7 @@ app.post("/history", (req, res, next) => {
                                     id, bounded, min, max], (error, stdout, stderr) => {
         if (error) {
             console.log('Child process error.');
-            res.status(500).send('Internal Server Error: Failed to retrieve model ' + req.body.id + '.');
+            res.status(500).send('Internal Server Error: Failed to retrieve model history.');
             return 
         }
         if (stderr) {
