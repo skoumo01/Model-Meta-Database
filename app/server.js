@@ -19,12 +19,12 @@ app.use(express.urlencoded({ extended: true })) // for parsing application/x-www
 
 
 /*
-curl --location --request PUT '10.16.30.89:3000/submit' \
+curl --location --request PUT 'localhost:3000/submit' \
 --header 'Content-Type: application/json' \
 --data-raw '{
     "organization": "org1",
     "user": "Admin", 
-    "peername": "peer1.org1.example.com",
+    "peername": "peer0.org1.example.com",
     "channel": "mychannel",
     "contract": "contract_models",
     "model": {
@@ -102,7 +102,7 @@ app.put('/submit', (req, res, next) => {
 });
 
 /*
-curl --location --request GET '10.16.30.89:3000/check?channel=mychannel&id=id_0'
+curl --location --request GET 'localhost:3000/check?channel=mychannel&id=id_0'
 */
 app.get('/check', (req, res, next) => {
 
@@ -129,7 +129,7 @@ app.get('/check', (req, res, next) => {
 
 
 /*
-curl --location --request POST '10.16.30.89:3000/latest' \
+curl --location --request POST 'localhost:3000/latest' \
 --header 'Content-Type: application/json' \
 --data-raw '{
     "organization": "org1",
@@ -137,7 +137,13 @@ curl --location --request POST '10.16.30.89:3000/latest' \
     "peername": "peer0.org1.example.com",
     "channel": "mychannel",
     "contract": "contract_models",
-    "id": "id_0"
+    "query": {
+        "id": "id_0",
+        "page_size": "1",
+        "bookmark": "",
+        "tag1": "tag1",
+        "tag2": "tag2"
+    }
 }'
 */
 app.post("/latest", (req, res, next) => {
@@ -168,36 +174,136 @@ app.post("/latest", (req, res, next) => {
             return
     }
 
-    if (!req.body.hasOwnProperty('id')){
-        res.status(400).send('Bad Request Error: Property (model) "id" is missing from request body.');
-        return
+
+    if (!req.body.hasOwnProperty('query')){        
+        res.status(400).send('Bad Request Error: Ensure valid query parameters are provided in the request body.');
+            return
     }
 
 
-    var opName = 'getLatest';
-    var child = execFile('node', ['run_models.js', req.body.organization, req.body.user, 
-                                    req.body.peername, req.body.channel, req.body.contract, opName,
-                                    req.body.id], (error, stdout, stderr) => {
-        if (error) {
-            console.log('Child process error.');
-            res.status(500).send('Internal Server Error: Failed to retrieve model ' + req.body.id + '.');
-            return 
-        }
-        if (stderr) {
-            let msg = stderr.split('(')[1].split(')')[1].replace('at getLatest', ' ').trim();
-            console.log('Blockchain error: ' + msg);
-            res.status(404).send('Bad Request:' + msg);
-            return 
-        }
-        var ledger_entry = JSON.parse(stdout);
-        res.status(200).send(ledger_entry);
-    });
+    if (req.body.query.hasOwnProperty('id')){
+        var opName = 'getLatest';
+        var child = execFile('node', ['run_models.js', req.body.organization, req.body.user, 
+                                        req.body.peername, req.body.channel, req.body.contract, opName,
+                                        req.body.query.id], (error, stdout, stderr) => {
+            if (error) {
+                console.log('Child process error.');
+                res.status(500).send('Internal Server Error: Failed to retrieve model ' + req.body.query.id + '.');
+                return 
+            }
+            if (stderr) {
+                let msg = stderr.split('(')[1].split(')')[1].replace('at getLatest', ' ').trim();
+                console.log('Blockchain error: ' + msg);
+                res.status(404).send('Bad Request:' + msg);
+                return 
+            }
+            var ledger_entry = JSON.parse(stdout);
+            res.status(200).send(ledger_entry);
+        });
+        return
+    }
+
+    if (!req.body.query.hasOwnProperty('page_size') || !req.body.query.hasOwnProperty('bookmark')){        
+        res.status(400).send('Bad Request Error: Ensure  valid "page_size" and "bookmark" parameters '+
+                                'are provided in the request body.');
+            return
+    }
+
+    if (req.body.query.hasOwnProperty('tag1') && !req.body.query.hasOwnProperty('tag2')){        
+        var opName = 'getTag1';
+        var child = execFile('node', ['run_models.js', req.body.organization, req.body.user, 
+                                        req.body.peername, req.body.channel, req.body.contract, opName,
+                                        req.body.query.tag1, req.body.query.page_size, req.body.query.bookmark],
+                                                                     (error, stdout, stderr) => {
+            if (error) {
+                console.log('Child process error.');
+                res.status(500).send('Internal Server Error: Failed to retrieve models with tag1 "' 
+                                    + req.body.query.tag1 + '".');
+                return 
+            }
+            if (stderr) {
+                let msg = stderr.split('(')[1].split(')')[1].replace('at getTag1', ' ').trim();
+                console.log('Blockchain error: ' + msg);
+                res.status(404).send('Bad Request:' + msg);
+                return 
+            }
+            var results = {};
+            try {
+                results = JSON.parse(stdout);
+            }catch{
+                results = {};
+            }
+            res.status(200).send(results);
+        });
+        return
+    }
+
+    if (!req.body.query.hasOwnProperty('tag1') && req.body.query.hasOwnProperty('tag2')){        
+        var opName = 'getTag2';
+        var child = execFile('node', ['run_models.js', req.body.organization, req.body.user, 
+                                        req.body.peername, req.body.channel, req.body.contract, opName,
+                                        req.body.query.tag2, req.body.query.page_size, req.body.query.bookmark], 
+                                                            (error, stdout, stderr) => {
+            if (error) {
+                console.log('Child process error.');
+                res.status(500).send('Internal Server Error: Failed to retrieve models with tag2 "' 
+                                    + req.body.query.tag2 + '".');
+                return 
+            }
+            if (stderr) {
+                let msg = stderr.split('(')[1].split(')')[1].replace('at getTag2', ' ').trim();
+                console.log('Blockchain error: ' + msg);
+                res.status(404).send('Bad Request:' + msg);
+                return 
+            }
+            var results = {};
+            try {
+                results = JSON.parse(stdout);
+            }catch{
+                results = {};
+            }
+            res.status(200).send(results);
+        });
+        return
+    }
+
+    if (req.body.query.hasOwnProperty('tag1') && req.body.query.hasOwnProperty('tag2')){        
+        var opName = 'getTag12';
+        var child = execFile('node', ['run_models.js', req.body.organization, req.body.user, 
+                                        req.body.peername, req.body.channel, req.body.contract, opName,
+                                        req.body.query.tag1, req.body.query.tag2,
+                                        req.body.query.page_size, req.body.query.bookmark], (error, stdout, stderr) => {
+            if (error) {
+                console.log('Child process error.');
+                res.status(500).send('Internal Server Error: Failed to retrieve models with tag1 "' 
+                                    + req.body.query.tag1 + '" and tag2 "' 
+                                    + req.body.query.tag2 + '".');
+                return 
+            }
+            if (stderr) {
+                let msg = stderr.split('(')[1].split(')')[1].replace('at getTag12', ' ').trim();
+                console.log('Blockchain error: ' + msg);
+                res.status(404).send('Bad Request:' + msg);
+                return 
+            }
+            var results = {};
+            try {
+                results = JSON.parse(stdout);
+            }catch{
+                results = {};
+            }
+            res.status(200).send(results);
+        });
+        return
+    }
+
+    res.status(400).send('Bad Request Error: Ensure valid query parameters are provided in the request body.');
     
 });
 
 
 /*
-curl --location --request POST '10.16.30.89:3000/history' \
+curl --location --request POST 'localhost:3000/history' \
 --header 'Content-Type: application/json' \
 --data-raw '{
     "organization": "org1",
@@ -205,10 +311,12 @@ curl --location --request POST '10.16.30.89:3000/history' \
     "peername": "peer0.org1.example.com",
     "channel": "mychannel",
     "contract": "contract_models",
-    "id": "id_0",
-    "bounded": "true",
-    "min": "1613918214",
-    "max": "1613918220"
+    "query": {
+        "id": "id_0",
+        "bounded": "true",
+        "min": "1614188540",
+        "max": "1614245906"
+    }
 }'
 */
 app.post("/history", (req, res, next) => {
@@ -238,18 +346,22 @@ app.post("/history", (req, res, next) => {
                             'refers to an existing peer name.');
             return
     }
+    if (!req.body.hasOwnProperty('query')){
+        res.status(400).send('Bad Request Error: Property "query" is missing from request body.');
+        return
+    }
 
-    if (!req.body.hasOwnProperty('id')){
+    if (!req.body.query.hasOwnProperty('id')){
         res.status(400).send('Bad Request Error: Property "id" is missing from request body.');
         return
     }
-    if (!req.body.hasOwnProperty('bounded')){
+    if (!req.body.query.hasOwnProperty('bounded')){
         res.status(400).send('Bad Request Error: Property "bounded" is missing from request body.');
         return
     }
     
-    var id = req.body.id;
-    var bounded = req.body.bounded;
+    var id = req.body.query.id;
+    var bounded = req.body.query.bounded;
     if (!(bounded === 'true') && !(bounded === 'false')){
         res.status(400).send('Bad Request Error: Invalid assignment to property "bounded".\nMust provide "true" or "false".');
         return
@@ -258,12 +370,12 @@ app.post("/history", (req, res, next) => {
     var min = "";
     var max = "";
     if (bounded === 'true'){
-        if (!req.body.hasOwnProperty('min') || !req.body.hasOwnProperty('max')){
+        if (!req.body.query.hasOwnProperty('min') || !req.body.query.hasOwnProperty('max')){
             res.status(400).send('Bad Request Error: Properties "min" and/or "max" is missing from request body.');
             return
         }
-        var min = req.body.min;
-        var max = req.body.max;
+        var min = req.body.query.min;
+        var max = req.body.query.max;
         if (isNaN(min) || isNaN(max) || (parseInt(max, 10) < parseInt(min, 10)) || (parseInt(max, 10) <= 0) || (parseInt(min, 10) <= 0)){
             res.status(400).send('Bad Request Error: Invalid assignment to property "min" and/or "max".\nMust provide a timestamp with an accuracy of seconds.');
             return
@@ -292,8 +404,6 @@ app.post("/history", (req, res, next) => {
     });
 
 });
-
-
 
 
 async function main() {

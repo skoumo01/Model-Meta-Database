@@ -6,6 +6,10 @@ var myArgs = process.argv.slice(2);
 //node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models submitModel id_0 tag1 tag2 model_str
 //node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getLatest id_1
 //node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getHistory id_0 false 1613556418 1613556450
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models queryAdHoc '{"selector":{"tag1":"tag1"}}' 2 ''
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getTag1 tag1 10 ''
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getTag2 tag2 10 ''
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getTag12 tag1 tag2 10 ''
 
 // Argument Parcing
 const ORG_NAME = myArgs[0];
@@ -21,6 +25,11 @@ var MODEL_STR = "";
 var IS_BOUNDED = "";
 var MIN_TIMESTAMP = "";
 var MAX_TIMESTAMP = "";
+var QUERY_STR = "";
+var TAG1 = "";
+var TAG2 = "";
+var PAGE_SIZE = "";
+var BOOKMARK = "";
 if (FUNCTION_CALL==='submitModel'){
     MODEL_ID = myArgs[6];    
     TAG1 = myArgs[7];    
@@ -33,6 +42,23 @@ if (FUNCTION_CALL==='submitModel'){
     IS_BOUNDED = myArgs[7]; // "true"/"false"
     MIN_TIMESTAMP = myArgs[8];
     MAX_TIMESTAMP = myArgs[9];
+}else if (FUNCTION_CALL==='queryAdHoc'){
+    QUERY_STR = myArgs[6];
+    PAGE_SIZE = myArgs[7];
+    BOOKMARK = myArgs[8];
+}else if (FUNCTION_CALL==='getTag1'){
+    TAG1 = myArgs[6];
+    PAGE_SIZE = myArgs[7];
+    BOOKMARK = myArgs[8];
+}else if (FUNCTION_CALL==='getTag2'){
+    TAG2 = myArgs[6];
+    PAGE_SIZE = myArgs[7];
+    BOOKMARK = myArgs[8];
+}else if (FUNCTION_CALL==='getTag12'){
+    TAG1 = myArgs[6];
+    TAG2 = myArgs[7];
+    PAGE_SIZE = myArgs[8];
+    BOOKMARK = myArgs[9];
 }
 
 // Constants for profile
@@ -81,11 +107,26 @@ async function main() {
         getLatest(MODEL_ID);
         
     }else if (FUNCTION_CALL==='getHistory'){
-        //retieves (un)bounded model history (i.e. submitted versions)
+        //retrieves (un)bounded model history (i.e. submitted versions)
         getHistory(MODEL_ID, IS_BOUNDED, MIN_TIMESTAMP, MAX_TIMESTAMP);
 
-    }
+    }else if (FUNCTION_CALL==='queryAdHoc'){
+        // retrieves models using the provided CouchDB ad hoc query
+        queryAdHoc(QUERY_STR, PAGE_SIZE, BOOKMARK);
 
+    }else if (FUNCTION_CALL==='getTag1'){
+        // retrieves models with the given tag1
+        getTag1(TAG1, PAGE_SIZE, BOOKMARK);
+
+    }else if (FUNCTION_CALL==='getTag2'){
+        // retrieves models with the given tag2
+        getTag2(TAG2, PAGE_SIZE, BOOKMARK);
+
+    }else if (FUNCTION_CALL==='getTag12'){
+        // retrieves models with the given tags
+        getTag12(TAG1, TAG2, PAGE_SIZE, BOOKMARK);
+
+    }
 }
 
 async function submitModel(tx_data) {
@@ -195,6 +236,37 @@ async function getHistory(model_id, is_bounded, min_timestamp, max_timestamp) {
     return 
 }
 
+async function queryAdHoc(query_string, page_size, bookmark) {
+
+    let peerName = channel.getChannelPeer(PEER_NAME)
+
+    let request = {
+         targets: peerName,
+         chaincodeId: CHAINCODE_ID,
+         fcn: 'QueryModelsWithPagination',
+         args: [query_string, page_size, bookmark]
+     };
+
+     // send the query proposal to the peer
+    let response = await channel.queryByChaincode(request);
+    console.log(response.toString());
+
+    return 
+}
+
+async function getTag1(tag1, page_size, bookmark){
+    await queryAdHoc('{"selector":{"tag1":"' + tag1 + '"}}', page_size, bookmark);
+}
+
+async function getTag2(tag2, page_size, bookmark){
+    await queryAdHoc('{"selector":{"tag2":"' + tag2 + '"}}', page_size, bookmark);
+}
+
+async function getTag12(tag1, tag2, page_size, bookmark){
+    await queryAdHoc('{"selector":{"$and":[{"tag1":"' + tag1 + '"},{"tag2":"' + tag2 + '"}]}}', page_size, bookmark);
+}
+
+
 async function setupTxListener(tx_id_string) {
 
     try{
@@ -231,8 +303,6 @@ async function setupTxListener(tx_id_string) {
         throw new Error('Listener Error.')
     }
 }
-
-
 
 async function setupClient() {
 
