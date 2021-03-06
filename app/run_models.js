@@ -3,13 +3,15 @@ const Client = require('fabric-client');
 const { exit } = require('process');
 
 var myArgs = process.argv.slice(2);
-//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models submitModel id_0 tag1 tag2 model_str
-//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getLatest id_1
-//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getHistory id_0 false 1613556418 1613556450
-//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models queryAdHoc '{"selector":{"tag1":"tag1"}}' 2 ''
-//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getTag1 tag1 10 ''
-//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getTag2 tag2 10 ''
-//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getTag12 tag1 tag2 10 ''
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models submitModel token id_0 tag1 tag2 model_str
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getLatest token id_1
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getHistory token id_0 false 1613556418 1613556450
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models queryAdHoc token '{"selector":{"tag1":"tag1"}}' 2 ''
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getTag1 token tag1 10 ''
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getTag2 token tag2 10 ''
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models getTag12 token tag1 tag2 10 ''
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models checkToken token
+//node run_models.js org1 Admin peer0.org1.example.com mychannel contract_models createToken token
 
 // Argument Parcing
 const ORG_NAME = myArgs[0];
@@ -17,7 +19,8 @@ const USER_NAME = myArgs[1];
 const PEER_NAME = myArgs[2];
 const CHANNEL_NAME = myArgs[3];
 const CHAINCODE_ID = myArgs[4];
-const FUNCTION_CALL = myArgs[5]; // "submitModel"/"getLatest"/"getHistory"
+const FUNCTION_CALL = myArgs[5];
+const TOKEN = myArgs[6];
 var MODEL_ID = "";    
 var TAG1 = "";
 var TAG2 = "";
@@ -31,34 +34,34 @@ var TAG2 = "";
 var PAGE_SIZE = "";
 var BOOKMARK = "";
 if (FUNCTION_CALL==='submitModel'){
-    MODEL_ID = myArgs[6];    
-    TAG1 = myArgs[7];    
-    TAG2 = myArgs[8];    
-    MODEL_STR = myArgs[9];
+    MODEL_ID = myArgs[7];    
+    TAG1 = myArgs[8];    
+    TAG2 = myArgs[9];    
+    MODEL_STR = myArgs[10];
 }else if (FUNCTION_CALL==='getLatest'){
-    MODEL_ID = myArgs[6];
+    MODEL_ID = myArgs[7];
 }else if (FUNCTION_CALL==='getHistory'){
-    MODEL_ID = myArgs[6];
-    IS_BOUNDED = myArgs[7]; // "true"/"false"
-    MIN_TIMESTAMP = myArgs[8];
-    MAX_TIMESTAMP = myArgs[9];
+    MODEL_ID = myArgs[7];
+    IS_BOUNDED = myArgs[8]; // "true"/"false"
+    MIN_TIMESTAMP = myArgs[9];
+    MAX_TIMESTAMP = myArgs[10];
 }else if (FUNCTION_CALL==='queryAdHoc'){
-    QUERY_STR = myArgs[6];
-    PAGE_SIZE = myArgs[7];
-    BOOKMARK = myArgs[8];
+    QUERY_STR = myArgs[7];
+    PAGE_SIZE = myArgs[8];
+    BOOKMARK = myArgs[9];
 }else if (FUNCTION_CALL==='getTag1'){
-    TAG1 = myArgs[6];
-    PAGE_SIZE = myArgs[7];
-    BOOKMARK = myArgs[8];
+    TAG1 = myArgs[7];
+    PAGE_SIZE = myArgs[8];
+    BOOKMARK = myArgs[9];
 }else if (FUNCTION_CALL==='getTag2'){
-    TAG2 = myArgs[6];
-    PAGE_SIZE = myArgs[7];
-    BOOKMARK = myArgs[8];
-}else if (FUNCTION_CALL==='getTag12'){
-    TAG1 = myArgs[6];
     TAG2 = myArgs[7];
     PAGE_SIZE = myArgs[8];
     BOOKMARK = myArgs[9];
+}else if (FUNCTION_CALL==='getTag12'){
+    TAG1 = myArgs[7];
+    TAG2 = myArgs[8];
+    PAGE_SIZE = myArgs[9];
+    BOOKMARK = myArgs[10];
 }
 
 // Constants for profile
@@ -126,6 +129,14 @@ async function main() {
         // retrieves models with the given tags
         getTag12(TAG1, TAG2, PAGE_SIZE, BOOKMARK);
 
+    }else if (FUNCTION_CALL==='createToken'){
+        // creates a new client token; i.e. authorizes a new client
+        createToken();
+
+    }else if (FUNCTION_CALL==='checkToken'){
+        // checks if the client token is valid; authorization check
+        checkToken();
+
     }
 }
 
@@ -140,7 +151,7 @@ async function submitModel(tx_data) {
         targets: peerName,
         chaincodeId: CHAINCODE_ID,
         fcn: 'SubmitModelEntry',
-        args: [tx_data.model_id, tx_data.tag1, tx_data.tag2, tx_data.serialized_model],
+        args: [TOKEN, tx_data.model_id, tx_data.tag1, tx_data.tag2, tx_data.serialized_model],
         chainId: CHANNEL_NAME,
         txId: tx_id
     };
@@ -198,17 +209,13 @@ async function getLatest(model_id) {
          targets: peerName,
          chaincodeId: CHAINCODE_ID,
          fcn: 'GetLatestVersion',
-         args: [model_id]
+         args: [TOKEN, model_id]
      };
 
-     // send the query proposal to the peer
-     try {
-        let response = await channel.queryByChaincode(request);
-        var not_found_catch = JSON.parse(response);
-        console.log(response.toString());
-     }catch{
-        throw new Error('Error: error in simulation: transaction returned with failure: Error: The Model ' + model_id + ' does not exist');
-     }
+    // send the query proposal to the peer
+    var response = await channel.queryByChaincode(request);
+    console.log(response.toString());
+     
      
 
     return 
@@ -222,7 +229,7 @@ async function getHistory(model_id, is_bounded, min_timestamp, max_timestamp) {
          targets: peerName,
          chaincodeId: CHAINCODE_ID,
          fcn: 'GetVersionRange',
-         args: [model_id, is_bounded, min_timestamp, max_timestamp]
+         args: [TOKEN, model_id, is_bounded, min_timestamp, max_timestamp]
      };
 
      // send the query proposal to the peer
@@ -244,7 +251,7 @@ async function queryAdHoc(query_string, page_size, bookmark) {
          targets: peerName,
          chaincodeId: CHAINCODE_ID,
          fcn: 'QueryModelsWithPagination',
-         args: [query_string, page_size, bookmark]
+         args: [TOKEN, query_string, page_size, bookmark]
      };
 
      // send the query proposal to the peer
@@ -254,14 +261,90 @@ async function queryAdHoc(query_string, page_size, bookmark) {
     return 
 }
 
+async function checkToken() {
+
+    let peerName = channel.getChannelPeer(PEER_NAME)
+
+    let request = {
+         targets: peerName,
+         chaincodeId: CHAINCODE_ID,
+         fcn: 'CheckClientToken',
+         args: [TOKEN]
+     };
+
+     // send the query proposal to the peer
+    let response = await channel.queryByChaincode(request);
+    console.log(response.toString());
+
+    return 
+}
+
+async function createToken() {
+
+    let peerName = channel.getChannelPeer(PEER_NAME)
+
+    var tx_id = client.newTransactionID();
+    let tx_id_string = tx_id.getTransactionID();
+    
+    var request = {
+        targets: peerName,
+        chaincodeId: CHAINCODE_ID,
+        fcn: 'CreateClientToken',
+        args: [TOKEN],
+        chainId: CHANNEL_NAME,
+        txId: tx_id
+    };
+
+
+    //console.log("#1 Transaction proposal successfully sent to channel.")
+    try{
+        let results = await channel.sendTransactionProposal(request);
+        
+        // Array of proposal responses
+        var proposalResponses = results[0];
+
+        var proposal = results[1];
+
+        var all_good = true;
+        for (var i in proposalResponses) {
+            let good = false
+            if (proposalResponses && proposalResponses[i].response &&
+                proposalResponses[i].response.status === 200) {
+                good = true;
+                //console.log(`\tChaincode invocation proposal response #${i} was good`);
+            } else {
+                //console.log(`\tChaincode invocation proposal response #${i} was bad!`);
+            }
+            all_good = all_good & good
+        }
+        //console.log("#2 Looped through the proposal responses all_good=", all_good)
+
+        await setupTxListener(tx_id_string)
+        //console.log('#3 Registered the Tx Listener')
+
+        var orderer_request = {
+            txId: tx_id,
+            proposalResponses: proposalResponses,
+            proposal: proposal
+        };
+
+        await channel.sendTransaction(orderer_request);
+        //console.log("#3 Transaction has been submitted.")
+
+    }catch{
+        //console.log('(Error: Failed to complete the transaction lifecycle procedure. '+
+         //               'Please ensure that the provided connection data is valid.')
+        exit(0);
+    }
+    
+}
+
 async function getTag1(tag1, page_size, bookmark){
     await queryAdHoc('{"selector":{"tag1":"' + tag1 + '"}}', page_size, bookmark);
 }
-
 async function getTag2(tag2, page_size, bookmark){
     await queryAdHoc('{"selector":{"tag2":"' + tag2 + '"}}', page_size, bookmark);
 }
-
 async function getTag12(tag1, tag2, page_size, bookmark){
     await queryAdHoc('{"selector":{"$and":[{"tag1":"' + tag1 + '"},{"tag2":"' + tag2 + '"}]}}', page_size, bookmark);
 }

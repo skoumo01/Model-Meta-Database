@@ -18,7 +18,7 @@ submit() { #OK
     -n ${CC_NAME}  \
     --peerAddresses localhost:7051 --tlsRootCertFiles $PEER0_ORG1_CA \
     --peerAddresses localhost:9051 --tlsRootCertFiles $PEER0_ORG2_CA \
-    -c '{"function": "SubmitModelEntry","Args": ["id_2", "tag1", "tag2" ,"model string 6"]}'
+    -c '{"function": "SubmitModelEntry","Args": [ "'$valid_uuid'", "id_3", "tag1", "tag2" ,"model string 6"]}'
     
 }
 
@@ -32,7 +32,7 @@ latest(){ #OK
     -n ${CC_NAME}  \
     --peerAddresses localhost:7051 --tlsRootCertFiles $PEER0_ORG1_CA \
     --peerAddresses localhost:9051 --tlsRootCertFiles $PEER0_ORG2_CA \
-    -c '{"function": "GetLatestVersion","Args": ["id_1"]}'
+    -c '{"function": "GetLatestVersion","Args": ["'$valid_uuid'", "id_2"]}'
 }
 
 history(){
@@ -45,7 +45,7 @@ history(){
     -n ${CC_NAME}  \
     --peerAddresses localhost:7051 --tlsRootCertFiles $PEER0_ORG1_CA \
     --peerAddresses localhost:9051 --tlsRootCertFiles $PEER0_ORG2_CA \
-    -c '{"function": "GetVersionRange","Args": ["id_1", "false", "1614187540", "1614187586"]}'
+    -c '{"function": "GetVersionRange","Args": ["'$valid_uuid'", "id_2", "false", "1614187540", "1614187586"]}'
 }
 
 adhoc(){
@@ -58,13 +58,42 @@ adhoc(){
     -n ${CC_NAME}  \
     --peerAddresses localhost:7051 --tlsRootCertFiles $PEER0_ORG1_CA \
     --peerAddresses localhost:9051 --tlsRootCertFiles $PEER0_ORG2_CA \
-    -c '{"function": "QueryModelsWithPagination","Args": ["{\"selector\"}:\"tag1\":\"tag1\"}}", "1", ""]}'
+    -c '{"function": "QueryModelsWithPagination","Args": ["'$valid_uuid'", "{\"selector\":{\"tag1\":\"tag1\"}}", "1", ""]}'
 }
 
+createToken(){
+    
+    peer chaincode invoke -o localhost:7050 \
+    --ordererTLSHostnameOverride orderer.example.com \
+    --tls \
+    --cafile $ORDERER_CA \
+    -C $CHANNEL_NAME \
+    -n ${CC_NAME}  \
+    --peerAddresses localhost:7051 --tlsRootCertFiles $PEER0_ORG1_CA \
+    --peerAddresses localhost:9051 --tlsRootCertFiles $PEER0_ORG2_CA \
+    -c '{"function": "CreateClientToken","Args": ["'$uuid'"]}'
+}
+
+checkToken(){
+    
+    peer chaincode invoke -o localhost:7050 \
+    --ordererTLSHostnameOverride orderer.example.com \
+    --tls \
+    --cafile $ORDERER_CA \
+    -C $CHANNEL_NAME \
+    -n ${CC_NAME}  \
+    --peerAddresses localhost:7051 --tlsRootCertFiles $PEER0_ORG1_CA \
+    --peerAddresses localhost:9051 --tlsRootCertFiles $PEER0_ORG2_CA \
+    -c '{"function": "CheckClientToken","Args": ["'$valid_uuid'"]}'
+}
 
 #model=$(<./scripts/testChaincode_data/model_base64)
+uuid=$(uuidgen)
+valid_uuid='93875b3e-a321-4635-88dc-3d05df3291f7'
 
 #submit
 #latest
 #history
-adhoc
+#adhoc
+#createToken
+#checkToken

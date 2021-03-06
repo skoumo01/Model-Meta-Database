@@ -4,47 +4,75 @@ const execFile = require('child_process').execFile;
 const HashMap = require('hashmap');
 
 var app = express();
-var channel_map = new HashMap();
+var submit_tx_map = new HashMap();
 
 
-var channels = ['mychannel'];
-var contracts = ['contract_models'];
-var organizations = ['org1', 'org2'];
-var users = ['Admin'];
-var peerNames = ['peer0.org1.example.com', 'peer1.org1.example.com'];
-                   // ,'peer0.org2.example.com','peer1.org2.example.com'];
+var channel = 'mychannel';
+var contract = 'contract_models';
+var organization = 'org1';
+var user = 'Admin';
+var peername = 'peer0.org1.example.com';
 
 app.use(express.json()) // for parsing application/json
 app.use(express.urlencoded({ extended: true })) // for parsing application/x-www-form-urlencoded
 
+/*
+curl --location --request POST '10.16.30.89:3000/token' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "token" : "newtoken"
+}'
+*/
+app.post('/token', (req, res, next) => {
 
+    if (!req.body.hasOwnProperty('token')){
+        res.status(400).send({'message':'Bad Request Error: Query parameter "token" is missing.'});
+        return
+    }
+
+    var opName = 'createToken';
+
+    var child = execFile('node', ['run_models.js', organization, user, peername, channel, contract, opName,
+                             req.body.token], (error, stdout, stderr) => {
+        if (error) {
+            console.log('Child process error.');
+            res.status(500).send({'message':'Internal Server Error: Failed to create token ' + req.body.token + '.'});
+            return 
+        }
+
+        try {
+            response = JSON.parse(stdout);
+        }catch{
+            res.status(201).send({'message':'Created'});
+            return
+        }
+
+        res.status(500).send({'message':'Internal Server Error: Failed to create token ' + req.body.token + '.'});
+
+    });    
+});
+
+
+/*
+curl --location --request PUT '10.16.30.89:3000/submit' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "token": "token",
+    "model": {
+        "id": "id_0",
+        "tag1": "tag1",
+        "tag2": "tag2",
+        "serialized_data": "dummy string 0"
+    }
+}'
+*/
 app.put('/submit', (req, res, next) => {
 
-    if (!req.body.hasOwnProperty('channel') || !channels.includes(req.body.channel)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "channel" is included in the request body and it '+
-                            'refers to an existing channel.'});
+    if (!req.body.hasOwnProperty('token')){
+        res.status(400).send({'message':'Bad Request Error: Property "token" is missing from request body.'});
         return
     }
-    if (!req.body.hasOwnProperty('contract') || !contracts.includes(req.body.contract)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "contract" is included in the request body and it '+
-                            'refers to an existing contract.'});
-        return
-    }
-    if (!req.body.hasOwnProperty('organization') || !organizations.includes(req.body.organization)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "organization" is included in the request body and it '+
-                            'refers to an existing organization.'});
-            return
-    }
-    if (!req.body.hasOwnProperty('user') || !users.includes(req.body.user)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "user" is included in the request body and it '+
-                            'refers to an existing user.'});
-            return
-    }
-    if (!req.body.hasOwnProperty('peername') || !peerNames.includes(req.body.peername)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "peername" is included in the request body and it '+
-                            'refers to an existing peer name.'});
-            return
-    }
+
     if (!req.body.hasOwnProperty('model')){
         res.status(400).send({'message':'Bad Request Error: Property "model_id" is missing from request body.'});
         return
@@ -57,94 +85,105 @@ app.put('/submit', (req, res, next) => {
 
     var opName = 'submitModel';
 
-    if (!channel_map.has(req.body.channel)){
-        channel_map.set(req.body.channel, new HashMap());
-    }
+    submit_tx_map.set(req.body.model.id, {is_completed: 'false', status: 'PENDING'});
 
-    channel_map.get(req.body.channel).set(req.body.model.id, {is_completed: 'false', status: 'PENDING'});
-
-    var child = execFile('node', ['run_models.js', req.body.organization, req.body.user, 
-                            req.body.peername, req.body.channel, req.body.contract, opName,
-                            req.body.model.id, req.body.model.tag1, req.body.model.tag2,
+    var child = execFile('node', ['run_models.js', organization, user, peername, channel, contract, opName,
+                             req.body.token,
+                             req.body.model.id, req.body.model.tag1, req.body.model.tag2,
                              req.body.model.serialized_data], (error, stdout, stderr) => {
         if (error) {
             console.log('Child process error.');
-            channel_map.get(req.body.channel).set(req.body.model.id, {is_completed: 'false', status: 'ERROR'});
+            submit_tx_map.set(req.body.model.id, {is_completed: 'false', status: 'ERROR'});
             return
         }
-        var response = JSON.parse(stdout);
+
+        var response = {};
+        try {
+            response = JSON.parse(stdout);
+        }catch{
+            submit_tx_map.set(req.body.model.id, {is_completed: 'false', status: 'UNAUTHORIZED'});
+            return
+        }
         if (!response.hasOwnProperty('status')){
-            channel_map.get(req.body.channel).set(req.body.model.id, {is_completed: 'false', status: 'ERROR'});
+            submit_tx_map.set(req.body.model.id, {is_completed: 'false', status: 'ERROR'});
             return
         }
-        channel_map.get(req.body.channel).set(req.body.model.id, {is_completed: 'true', status: response.status});
+        submit_tx_map.set(req.body.model.id, {is_completed: 'true', status: response.status});
 
     });
     res.status(200).send({'message':'OK'});
     
 });
 
+/*
+curl --location --request GET '10.16.30.89:3000/check?id=id_0&token=token'
+*/
 app.get('/check', (req, res, next) => {
 
-    if (!req.query.hasOwnProperty('channel') || !channels.includes(req.query.channel)){
-        res.status(400).send({'message':'Bad Request Error: Ensure query parameter "channel" is provided and it '+
-                            'refers to an existing channel.'});
+    if (req.query.hasOwnProperty('token')){    
+        var opName = 'checkToken';
+        var child = execFile('node', ['run_models.js', organization, user, peername, channel, contract, opName,
+                                        req.query.token], (error, stdout, stderr) => {
+            if (error) {
+                console.log('Child process error.');
+                res.status(500).send({'message':'Internal Server Error: Failed to retrieve model ' + req.query.id + '.'});
+                return 
+            }
+            if (stderr) {
+                let msg = stderr.split('(')[1].split(')')[1].replace('at checkToken', ' ').trim();
+                console.log('Blockchain error: ' + msg);
+                res.status(404).send({'message':'Bad Request:' + msg});
+                return 
+            }
+            if (stdout.includes('false')){
+                res.status(401).send({'message':'Unauthorized: authorization not granded: token ' + req.query.token
+                                        +' is invalid'});
+                return
+            }
+        });
+    }else{
+        res.status(400).send({'message':'Bad Request Error: Property "token" is missing from request body.'});
         return
-    }    
+    }
+
     if (!req.query.hasOwnProperty('id')){
         res.status(400).send({'message':'Bad Request Error: Ensure query parameter "id" is provided.'});
             return
     }
     
-    
-    if (!channel_map.has(req.query.channel) || !channel_map.get(req.query.channel).has(req.query.id)){
-        res.status(404).send({'message':'Not Found: Model with id "' + req.query.id + '" does not exist on channel "'
-                                + req.query.channel + '".'});
+    if (!submit_tx_map.has(req.query.id)){
+        res.status(404).send({'message':'Not Found: Model with id "' + req.query.id + '" does not exist.'});
         return
     }
 
-    res.status(200).send(channel_map.get(req.query.channel).get(req.query.id));
+    res.status(200).send(submit_tx_map.get(req.query.id));
 });
 
 
+/*
+curl --location --request GET '10.16.30.89:3000/latest/model?id=id_0&token=token'
+*/
+app.get("/latest/model", (req, res, next) => {
 
-app.post("/latest/model", (req, res, next) => {
-
-    if (!req.body.hasOwnProperty('channel') || !channels.includes(req.body.channel)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "channel" is included in the request body and it '+
-                            'refers to an existing channel.'});
-        return
-    }
-    if (!req.body.hasOwnProperty('contract') || !contracts.includes(req.body.contract)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "contract" is included in the request body and it '+
-                            'refers to an existing contract.'});
-        return
-    }
-    if (!req.body.hasOwnProperty('organization') || !organizations.includes(req.body.organization)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "organization" is included in the request body and it '+
-                            'refers to an existing organization.'});
+    if (!req.query.hasOwnProperty('token')){
+        res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
             return
     }
-    if (!req.body.hasOwnProperty('user') || !users.includes(req.body.user)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "user" is included in the request body and it '+
-                            'refers to an existing user.'});
-            return
-    }
-    if (!req.body.hasOwnProperty('peername') || !peerNames.includes(req.body.peername)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "peername" is included in the request body and it '+
-                            'refers to an existing peer name.'});
-            return
-    }
-
-    if (req.body.hasOwnProperty('id')){
+    
+    if (req.query.hasOwnProperty('id')){
         var opName = 'getLatest';
-        var child = execFile('node', ['run_models.js', req.body.organization, req.body.user, 
-                                        req.body.peername, req.body.channel, req.body.contract, opName,
-                                        req.body.id], (error, stdout, stderr) => {
+        var child = execFile('node', ['run_models.js', organization, user, peername, channel, contract, opName,
+                                        req.query.token,
+                                        req.query.id], (error, stdout, stderr) => {
             if (error) {
                 console.log('Child process error.');
-                res.status(500).send({'message':'Internal Server Error: Failed to retrieve model ' + req.body.id + '.'});
+                res.status(500).send({'message':'Internal Server Error: Failed to retrieve model ' + req.query.id + '.'});
                 return 
+            }
+            if (stdout.includes('authorization')){
+                res.status(401).send({'message':'Unauthorized: authorization not granded: token ' + req.query.token
+                                        +' is invalid'});
+                return
             }
             if (stderr) {
                 let msg = stderr.split('(')[1].split(')')[1].replace('at getLatest', ' ').trim();
@@ -152,67 +191,45 @@ app.post("/latest/model", (req, res, next) => {
                 res.status(404).send({'message':'Bad Request:' + msg});
                 return 
             }
+            
             var ledger_entry = JSON.parse(stdout);
             res.status(200).send(ledger_entry);
         });
         return
     }
 
-    res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided in the request body.'});
+    res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
     
 });
 
-app.post("/latest/tags", (req, res, next) => {
 
-    if (!req.body.hasOwnProperty('channel') || !channels.includes(req.body.channel)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "channel" is included in the request body and it '+
-                            'refers to an existing channel.'});
-        return
-    }
-    if (!req.body.hasOwnProperty('contract') || !contracts.includes(req.body.contract)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "contract" is included in the request body and it '+
-                            'refers to an existing contract.'});
-        return
-    }
-    if (!req.body.hasOwnProperty('organization') || !organizations.includes(req.body.organization)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "organization" is included in the request body and it '+
-                            'refers to an existing organization.'});
-            return
-    }
-    if (!req.body.hasOwnProperty('user') || !users.includes(req.body.user)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "user" is included in the request body and it '+
-                            'refers to an existing user.'});
-            return
-    }
-    if (!req.body.hasOwnProperty('peername') || !peerNames.includes(req.body.peername)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "peername" is included in the request body and it '+
-                            'refers to an existing peer name.'});
+/*
+curl --location --request GET '10.16.30.89:3000/latest/tags?page_size=1&bookmark=&tag1=tag1&tag2=tag2&token=token'
+*/
+app.get("/latest/tags", (req, res, next) => {
+
+    if (!req.query.hasOwnProperty('token')){
+        res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
             return
     }
 
-
-    if (!req.body.hasOwnProperty('query')){        
-        res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided in the request body.'});
+    if (!req.query.hasOwnProperty('page_size') || !req.query.hasOwnProperty('bookmark')){        
+        res.status(400).send({'message':'Bad Request Error: Ensure  valid "page_size" and "bookmark" query' +
+                                ' parameters are provided.'});
             return
     }
 
-    if (!req.body.query.hasOwnProperty('page_size') || !req.body.query.hasOwnProperty('bookmark')){        
-        res.status(400).send({'message':'Bad Request Error: Ensure  valid "page_size" and "bookmark" parameters '+
-                                'are provided in the request body.'});
-            return
-    }
-
-    if (req.body.query.hasOwnProperty('tag1') && req.body.query.hasOwnProperty('tag2')){        
+    if (req.query.hasOwnProperty('tag1') && req.query.hasOwnProperty('tag2')){        
         var opName = 'getTag12';
-        var child = execFile('node', ['run_models.js', req.body.organization, req.body.user, 
-                                        req.body.peername, req.body.channel, req.body.contract, opName,
-                                        req.body.query.tag1, req.body.query.tag2,
-                                        req.body.query.page_size, req.body.query.bookmark], (error, stdout, stderr) => {
+        var child = execFile('node', ['run_models.js', organization, user, peername, channel, contract, opName,
+                                        req.query.token,
+                                        req.query.tag1, req.query.tag2,
+                                        req.query.page_size, req.query.bookmark], (error, stdout, stderr) => {
             if (error) {
                 console.log('Child process error.');
                 res.status(500).send({'message':'Internal Server Error: Failed to retrieve models with tag1 "' 
-                                    + req.body.query.tag1 + '" and tag2 "' 
-                                    + req.body.query.tag2 + '".'});
+                                    + req.query.tag1 + '" and tag2 "' 
+                                    + req.query.tag2 + '".'});
                 return 
             }
             if (stderr) {
@@ -224,7 +241,12 @@ app.post("/latest/tags", (req, res, next) => {
             var results = {};
             try {
                 results = JSON.parse(stdout);
-            }catch{
+            }catch{             
+                if (stdout.includes('authorization')){
+                    res.status(401).send({'message':'Unauthorized: authorization not granded: token ' + req.query.token
+                                            +' is invalid'});
+                    return
+                }
                 results = {"records" : []};
             }
             res.status(200).send(results);
@@ -232,60 +254,37 @@ app.post("/latest/tags", (req, res, next) => {
         return
     }
 
-    res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided in the request body.'});
+    res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
     
 });
 
-app.post("/latest/tags/tag1", (req, res, next) => {
+/*
+curl --location --request GET '10.16.30.89:3000/latest/tags/tag1?page_size=1&bookmark=&tag1=tag1&token=token'
+*/
+app.get("/latest/tags/tag1", (req, res, next) => {
 
-    if (!req.body.hasOwnProperty('channel') || !channels.includes(req.body.channel)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "channel" is included in the request body and it '+
-                            'refers to an existing channel.'});
-        return
-    }
-    if (!req.body.hasOwnProperty('contract') || !contracts.includes(req.body.contract)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "contract" is included in the request body and it '+
-                            'refers to an existing contract.'});
-        return
-    }
-    if (!req.body.hasOwnProperty('organization') || !organizations.includes(req.body.organization)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "organization" is included in the request body and it '+
-                            'refers to an existing organization.'});
+    if (!req.query.hasOwnProperty('token')){
+        res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
             return
     }
-    if (!req.body.hasOwnProperty('user') || !users.includes(req.body.user)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "user" is included in the request body and it '+
-                            'refers to an existing user.'});
-            return
-    }
-    if (!req.body.hasOwnProperty('peername') || !peerNames.includes(req.body.peername)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "peername" is included in the request body and it '+
-                            'refers to an existing peer name.'});
+    
+    if (!req.query.hasOwnProperty('page_size') || !req.query.hasOwnProperty('bookmark')){        
+        res.status(400).send({'message':'Bad Request Error: Ensure  valid "page_size" and "bookmark" query' +
+                                ' parameters are provided.'});
             return
     }
 
 
-    if (!req.body.hasOwnProperty('query')){        
-        res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided in the request body.'});
-            return
-    }
-
-    if (!req.body.query.hasOwnProperty('page_size') || !req.body.query.hasOwnProperty('bookmark')){        
-        res.status(400).send({'message':'Bad Request Error: Ensure  valid "page_size" and "bookmark" parameters '+
-                                'are provided in the request body.'});
-            return
-    }
-
-    if (req.body.query.hasOwnProperty('tag1')){        
+    if (req.query.hasOwnProperty('tag1')){        
         var opName = 'getTag1';
-        var child = execFile('node', ['run_models.js', req.body.organization, req.body.user, 
-                                        req.body.peername, req.body.channel, req.body.contract, opName,
-                                        req.body.query.tag1, req.body.query.page_size, req.body.query.bookmark],
+        var child = execFile('node', ['run_models.js', organization, user, peername, channel, contract, opName,
+                                        req.query.token,
+                                        req.query.tag1, req.query.page_size, req.query.bookmark],
                                                                      (error, stdout, stderr) => {
             if (error) {
                 console.log('Child process error.');
                 res.status(500).send({'message':'Internal Server Error: Failed to retrieve models with tag1 "' 
-                                    + req.body.query.tag1 + '".'});
+                                    + req.query.tag1 + '".'});
                 return 
             }
             if (stderr) {
@@ -298,69 +297,49 @@ app.post("/latest/tags/tag1", (req, res, next) => {
             try {
                 results = JSON.parse(stdout);
             }catch{
-                results = {};
+                if (stdout.includes('authorization')){
+                    res.status(401).send({'message':'Unauthorized: authorization not granded: token ' + req.query.token
+                                            +' is invalid'});
+                    return
+                }
+                results = {"records" : []};
             }
             res.status(200).send(results);
         });
         return
     }
 
-    res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided in the request body.'});
+    res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
     
 });
 
+/*
+10.16.30.89:3000/latest/tags/tag2?page_size=2&bookmark=&tag2=tag2&token=token
+*/
+app.get("/latest/tags/tag2", (req, res, next) => {
 
-app.post("/latest/tags/tag2", (req, res, next) => {
-
-    if (!req.body.hasOwnProperty('channel') || !channels.includes(req.body.channel)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "channel" is included in the request body and it '+
-                            'refers to an existing channel.'});
-        return
-    }
-    if (!req.body.hasOwnProperty('contract') || !contracts.includes(req.body.contract)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "contract" is included in the request body and it '+
-                            'refers to an existing contract.'});
-        return
-    }
-    if (!req.body.hasOwnProperty('organization') || !organizations.includes(req.body.organization)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "organization" is included in the request body and it '+
-                            'refers to an existing organization.'});
+    if (!req.query.hasOwnProperty('token')){
+        res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
             return
     }
-    if (!req.body.hasOwnProperty('user') || !users.includes(req.body.user)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "user" is included in the request body and it '+
-                            'refers to an existing user.'});
-            return
-    }
-    if (!req.body.hasOwnProperty('peername') || !peerNames.includes(req.body.peername)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "peername" is included in the request body and it '+
-                            'refers to an existing peer name.'});
-            return
-    }
-
-
-    if (!req.body.hasOwnProperty('query')){        
-        res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided in the request body.'});
-            return
-    }
-
-    if (!req.body.query.hasOwnProperty('page_size') || !req.body.query.hasOwnProperty('bookmark')){        
-        res.status(400).send({'message':'Bad Request Error: Ensure  valid "page_size" and "bookmark" parameters '+
-                                'are provided in the request body.'});
+    
+    if (!req.query.hasOwnProperty('page_size') || !req.query.hasOwnProperty('bookmark')){        
+        res.status(400).send({'message':'Bad Request Error: Ensure  valid "page_size" and "bookmark" query' +
+                                ' parameters are provided.'});
             return
     }
 
     
-    if (req.body.query.hasOwnProperty('tag2')){        
+    if (req.query.hasOwnProperty('tag2')){        
         var opName = 'getTag2';
-        var child = execFile('node', ['run_models.js', req.body.organization, req.body.user, 
-                                        req.body.peername, req.body.channel, req.body.contract, opName,
-                                        req.body.query.tag2, req.body.query.page_size, req.body.query.bookmark], 
+        var child = execFile('node', ['run_models.js', organization, user, peername, channel, contract, opName,
+                                        req.query.token,
+                                        req.query.tag2, req.query.page_size, req.query.bookmark], 
                                                             (error, stdout, stderr) => {
             if (error) {
                 console.log('Child process error.');
                 res.status(500).send({'message':'Internal Server Error: Failed to retrieve models with tag2 "' 
-                                    + req.body.query.tag2 + '".'});
+                                    + req.query.tag2 + '".'});
                 return 
             }
             if (stderr) {
@@ -373,79 +352,42 @@ app.post("/latest/tags/tag2", (req, res, next) => {
             try {
                 results = JSON.parse(stdout);
             }catch{
-                results = {};
+                if (stdout.includes('authorization')){
+                    res.status(401).send({'message':'Unauthorized: authorization not granded: token ' + req.query.token
+                                            +' is invalid'});
+                    return
+                }
+                results = {"records" : []};
             }
             res.status(200).send(results);
         });
         return
     }
 
-    res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided in the request body.'});
+    res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
     
 });
 
 
-
 /*
-curl --location --request POST 'localhost:3000/history' \
---header 'Content-Type: application/json' \
---data-raw '{
-    "organization": "org1",
-    "user": "Admin", 
-    "peername": "peer0.org1.example.com",
-    "channel": "mychannel",
-    "contract": "contract_models",
-    "query": {
-        "id": "id_0",
-        "bounded": "true",
-        "min": "1614188540",
-        "max": "1614245906"
-    }
-}'
+curl --location --request GET '10.16.30.89:3000/history?id=id_0&bounded=false&min=1615035024&max=1615036624&token=token'
 */
-app.post("/history", (req, res, next) => {
+app.get("/history", (req, res, next) => {
 
-    if (!req.body.hasOwnProperty('channel') || !channels.includes(req.body.channel)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "channel" is included in the request body and it '+
-                            'refers to an existing channel.'});
-        return
-    }
-    if (!req.body.hasOwnProperty('contract') || !contracts.includes(req.body.contract)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "contract" is included in the request body and it '+
-                            'refers to an existing contract.'});
-        return
-    }
-    if (!req.body.hasOwnProperty('organization') || !organizations.includes(req.body.organization)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "organization" is included in the request body and it '+
-                            'refers to an existing organization.'});
+    if (!req.query.hasOwnProperty('token')){
+        res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
             return
-    }
-    if (!req.body.hasOwnProperty('user') || !users.includes(req.body.user)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "user" is included in the request body and it '+
-                            'refers to an existing user.'});
-            return
-    }
-    if (!req.body.hasOwnProperty('peername') || !peerNames.includes(req.body.peername)){
-        res.status(400).send({'message':'Bad Request Error: Ensure property "peername" is included in the request body and it '+
-                            'refers to an existing peer name.'});
-            return
-    }
-    if (!req.body.hasOwnProperty('query')){
-        res.status(400).send({'message':'Bad Request Error: Property "query" is missing from request body.'});
-        return
-    }
-
-    if (!req.body.query.hasOwnProperty('id')){
-        res.status(400).send({'message':'Bad Request Error: Property "id" is missing from request body.'});
-        return
-    }
-    if (!req.body.query.hasOwnProperty('bounded')){
-        res.status(400).send({'message':'Bad Request Error: Property "bounded" is missing from request body.'});
-        return
     }
     
-    var id = req.body.query.id;
-    var bounded = req.body.query.bounded;
+    if (!req.query.hasOwnProperty('id') || !req.query.hasOwnProperty('bounded')){        
+        res.status(400).send({'message':'Bad Request Error: Ensure  valid "page_size" and "bookmark" query' +
+                                ' parameters are provided.'});
+            return
+    }
+
+    
+    var id = req.query.id;
+    var bounded = req.query.bounded;
     if (!(bounded === 'true') && !(bounded === 'false')){
         res.status(400).send({'message':'Bad Request Error: Invalid assignment to property "bounded".\nMust provide "true" or "false".'});
         return
@@ -454,23 +396,23 @@ app.post("/history", (req, res, next) => {
     var min = "";
     var max = "";
     if (bounded === 'true'){
-        if (!req.body.query.hasOwnProperty('min') || !req.body.query.hasOwnProperty('max')){
-            res.status(400).send({'message':'Bad Request Error: Properties "min" and/or "max" is missing from request body.'});
+        if (!req.query.hasOwnProperty('min') || !req.query.hasOwnProperty('max')){
+            res.status(400).send({'message':'Bad Request Error: Query arameters "min" and/or "max" is/are missing.'});
             return
         }
-        var min = req.body.query.min;
-        var max = req.body.query.max;
+        var min = req.query.min;
+        var max = req.query.max;
         if (isNaN(min) || isNaN(max) || (parseInt(max, 10) < parseInt(min, 10)) || (parseInt(max, 10) <= 0) || (parseInt(min, 10) <= 0)){
-            res.status(400).send({'message':'Bad Request Error: Invalid assignment to property "min" and/or "max".\nMust provide a timestamp with an accuracy of seconds.'});
+            res.status(400).send({'message':'Bad Request Error: Invalid assignment to property "min" and/or "max".\n'+
+                                'Must provide a timestamp with an accuracy of seconds.'});
             return
         }
     }
     
-    
 
     var opName = 'getHistory';
-    var child = execFile('node', ['run_models.js', req.body.organization, req.body.user, 
-                                    req.body.peername, req.body.channel, req.body.contract, opName,
+    var child = execFile('node', ['run_models.js', organization, user, peername, channel, contract, opName,
+                                    req.query.token,
                                     id, bounded, min, max], (error, stdout, stderr) => {
         if (error) {
             console.log('Child process error.');
@@ -488,6 +430,11 @@ app.post("/history", (req, res, next) => {
         try{
             history = JSON.parse(stdout);
         }catch{
+            if (stdout.includes('authorization')){
+                res.status(401).send({'message':'Unauthorized: authorization not granded: token ' + req.query.token
+                                        +' is invalid'});
+                return
+            }
             history = [];
         }
         res.status(200).send(history);
@@ -498,13 +445,13 @@ app.post("/history", (req, res, next) => {
 
 async function main() {
 
+    //console.log(uuidv4());
+
     var server = app.listen(3000, function () {
         var host = server.address().address
         var port = server.address().port
         console.log("Example app listening at http://%s:%s", host, port)
     })
-
-    
 
 }
 

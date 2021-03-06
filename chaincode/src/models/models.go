@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
@@ -40,8 +39,38 @@ type PaginatedQueryResult struct {
 	Bookmark            string              `json:"bookmark"`
 }
 
+// Creates a new client token using uuid
+func (t *SimpleChaincode) CreateClientToken(ctx contractapi.TransactionContextInterface, token string) (string, error) {
+
+	err := ctx.GetStub().PutState(token, []byte{'t', 'o', 'k', 'e', 'n'})
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
+}
+
+// Checks if a client token exists
+func (t *SimpleChaincode) CheckClientToken(ctx contractapi.TransactionContextInterface, token string) (bool, error) {
+	tokenBytes, err := ctx.GetStub().GetState(token)
+	if err != nil {
+		return false, fmt.Errorf("failed to retrieve token %s from world state. %v", token, err)
+	}
+
+	return tokenBytes != nil, nil
+}
+
 // Initializes a new model in the ledger: OK
-func (t *SimpleChaincode) SubmitModelEntry(ctx contractapi.TransactionContextInterface, modelID, tag1, tag2, serializedModel string) error {
+func (t *SimpleChaincode) SubmitModelEntry(ctx contractapi.TransactionContextInterface, token, modelID, tag1, tag2, serializedModel string) error {
+
+	tokenBytes, err := ctx.GetStub().GetState(token)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve token %s from world state. %v", token, err)
+	}
+
+	if tokenBytes == nil {
+		return fmt.Errorf("authorization not granded: token %s is invalid", token)
+	}
 
 	model := &ModelData{
 		Tag1:            tag1,
@@ -62,7 +91,17 @@ func (t *SimpleChaincode) SubmitModelEntry(ctx contractapi.TransactionContextInt
 }
 
 // Retrieves a model from the ledger: OK
-func (t *SimpleChaincode) GetLatestVersion(ctx contractapi.TransactionContextInterface, modelID string) (*ModelData, error) {
+func (t *SimpleChaincode) GetLatestVersion(ctx contractapi.TransactionContextInterface, token, modelID string) (*ModelData, error) {
+
+	tokenBytes, err := ctx.GetStub().GetState(token)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve token %s from world state. %v", token, err)
+	}
+
+	if tokenBytes == nil {
+		return nil, fmt.Errorf("authorization not granded: token %s is invalid", token)
+	}
+
 	modelBytes, err := ctx.GetStub().GetState(modelID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get model %s: %v", modelID, err)
@@ -81,8 +120,18 @@ func (t *SimpleChaincode) GetLatestVersion(ctx contractapi.TransactionContextInt
 }
 
 // Returns the (un)bounded version history of the requested model: OK
-func (t *SimpleChaincode) GetVersionRange(ctx contractapi.TransactionContextInterface, modelID string, isBounded bool, min, max int64) ([]HistoryQueryResult, error) {
-	log.Printf("GetModelHistory: ID %v", modelID)
+func (t *SimpleChaincode) GetVersionRange(ctx contractapi.TransactionContextInterface, token, modelID string, isBounded bool, min, max int64) ([]HistoryQueryResult, error) {
+
+	tokenBytes, err := ctx.GetStub().GetState(token)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve token %s from world state. %v", token, err)
+	}
+
+	if tokenBytes == nil {
+		return nil, fmt.Errorf("authorization not granded: token %s is invalid", token)
+	}
+
+	//log.Printf("GetModelHistory: ID %v", modelID)
 
 	resultsIterator, err := ctx.GetStub().GetHistoryForKey(modelID)
 	if err != nil {
@@ -143,7 +192,16 @@ func (t *SimpleChaincode) GetVersionRange(ctx contractapi.TransactionContextInte
 // Only available on state databases that support rich query (e.g. CouchDB)
 // Paginated queries are only valid for read only transactions.
 // Example: Pagination with Ad hoc Rich Query
-func (t *SimpleChaincode) QueryModelsWithPagination(ctx contractapi.TransactionContextInterface, queryString string, pageSize int, bookmark string) (*PaginatedQueryResult, error) {
+func (t *SimpleChaincode) QueryModelsWithPagination(ctx contractapi.TransactionContextInterface, token, queryString string, pageSize int, bookmark string) (*PaginatedQueryResult, error) {
+	tokenBytes, err := ctx.GetStub().GetState(token)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve token %s from world state. %v", token, err)
+	}
+
+	if tokenBytes == nil {
+		return nil, fmt.Errorf("authorization not granded: token %s is invalid", token)
+	}
+
 	return getQueryResultForQueryStringWithPagination(ctx, queryString, int32(pageSize), bookmark)
 }
 
@@ -197,26 +255,6 @@ func constructQueryResponseFromIterator(resultsIterator shim.StateQueryIteratorI
 
 	return models, nil
 }
-
-/*
-// QueryModelsByTag1 queries for models based on tag1.
-func (t *SimpleChaincode) QueryModelsByTag1(ctx contractapi.TransactionContextInterface, tag1 string) ([]*ModelData, error) {
-	queryString := fmt.Sprintf(`{"selector":{"tag1":"%s"}}`, tag1)
-	return getQueryResultForQueryString(ctx, queryString)
-}
-*/
-
-/*
-// ModelExists returns true when model with given ID exists in the ledger.
-func (t *SimpleChaincode) ModelExists(ctx contractapi.TransactionContextInterface, modelID string) (bool, error) {
-	modelBytes, err := ctx.GetStub().GetState(modelID)
-	if err != nil {
-		return false, fmt.Errorf("failed to read model %s from world state. %v", modelID, err)
-	}
-
-	return modelBytes != nil, nil
-}
-*/
 
 func (t *SimpleChaincode) Init(ctx contractapi.TransactionContextInterface) error {
 	return nil
