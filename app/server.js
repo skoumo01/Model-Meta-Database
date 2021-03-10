@@ -6,9 +6,8 @@ var app = express();
 var submit_tx_map = new HashMap();
 var submit_token_map = new HashMap();
 
-app.use(express.json()) // for parsing application/json
-app.use(express.urlencoded({ extended: true })) // for parsing application/x-www-form-urlencoded
-
+app.use(express.json({limit: '500mb'}));
+app.use(express.urlencoded({limit: '500mb', extended: true }));
 
 //////////////////////////////////////////////BLOCKCHAIN CLIENT///////////////////////////////////////////////
 const Client = require('fabric-client');
@@ -66,7 +65,7 @@ async function submitModel(model_id, tx_data) {
     };
 
 
-    //console.log("#1 Transaction proposal successfully sent to channel.")
+    console.log("#1 Transaction proposal successfully sent to channel.")
     try{
         let results = await channel.sendTransactionProposal(request);
         
@@ -81,16 +80,16 @@ async function submitModel(model_id, tx_data) {
             if (proposalResponses && proposalResponses[i].response &&
                 proposalResponses[i].response.status === 200) {
                 good = true;
-                //console.log(`\tChaincode invocation proposal response #${i} was good`);
+                console.log(`\tChaincode invocation proposal response #${i} was good`);
             } else {
-                //console.log(`\tChaincode invocation proposal response #${i} was bad!`);
+                console.log(`\tChaincode invocation proposal response #${i} was bad!`);
             }
             all_good = all_good & good
         }
-        //console.log("#2 Looped through the proposal responses all_good=", all_good)
+        console.log("#2 Looped through the proposal responses all_good=", all_good)
 
         await setupTxListener(tx_id_string, 'model')
-        //console.log('#3 Registered the Tx Listener')
+        console.log('#3 Registered the Tx Listener')
 
         var orderer_request = {
             txId: tx_id,
@@ -99,7 +98,7 @@ async function submitModel(model_id, tx_data) {
         };
 
         await channel.sendTransaction(orderer_request);
-        //console.log("#4 Transaction has been submitted.")
+        console.log("#4 Transaction has been submitted.")
 
     }catch{
         submit_tx_map.set(MODEL_ID, {is_completed: 'true', status: 'UNAUTHORIZED'});
@@ -257,9 +256,9 @@ async function setupTxListener(tx_id_string, type) {
 
         event_hub.registerTxEvent(tx_id_string, (tx, code, block_num) => {
                     
-            //console.log("#5 Received Tx Event")
-            //console.log('The chaincode invoke chaincode transaction has been committed on peer %s', event_hub.getPeerAddr());
-            //console.log('Transaction %s is in block %s', tx, block_num);
+            console.log("#5 Received Tx Event")
+            console.log('The chaincode invoke chaincode transaction has been committed on peer %s', event_hub.getPeerAddr());
+            console.log('Transaction %s is in block %s', tx, block_num);
             
             if (code !== 'VALID') {
                 if (type === 'token'){
