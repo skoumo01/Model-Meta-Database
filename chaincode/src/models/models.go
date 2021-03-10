@@ -99,7 +99,7 @@ func (t *SimpleChaincode) GetLatestVersion(ctx contractapi.TransactionContextInt
 	}
 
 	if tokenBytes == nil {
-		return nil, fmt.Errorf("authorization not granded: token %s is invalid", token)
+		return nil, fmt.Errorf("authorization not granded: token %s is invalid", token) //these error msgs can be caught with response.toString().includes('...') form the caller(!)
 	}
 
 	modelBytes, err := ctx.GetStub().GetState(modelID)
