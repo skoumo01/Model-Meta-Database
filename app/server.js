@@ -23,11 +23,9 @@ var TOKEN = '';
 var MODEL_ID = '';    
 var TAG1 = '';
 var TAG2 = '';
-var MODEL_STR = '';
 var IS_BOUNDED = '';
 var MIN_TIMESTAMP = '';
 var MAX_TIMESTAMP = '';
-var QUERY_STR = '';
 var PAGE_SIZE = '';
 var BOOKMARK = '';
 
@@ -51,7 +49,7 @@ var client = {}
 // Variable to hold the channel
 var channel = {}
 
-async function submitModel(model_id, tag1, tag2, serialized_model) {
+async function submitModel(model_id, tx_data) {
 
     let peerName = channel.getChannelPeer(PEER_NAME)
 
@@ -62,7 +60,7 @@ async function submitModel(model_id, tag1, tag2, serialized_model) {
         targets: peerName,
         chaincodeId: CHAINCODE_ID,
         fcn: 'SubmitModelEntry',
-        args: [TOKEN, model_id, tag1, tag2, serialized_model],
+        args: [TOKEN, model_id, JSON.stringify(tx_data)],
         chainId: CHANNEL_NAME,
         txId: tx_id
     };
@@ -101,7 +99,7 @@ async function submitModel(model_id, tag1, tag2, serialized_model) {
         };
 
         await channel.sendTransaction(orderer_request);
-        //console.log("#3 Transaction has been submitted.")
+        //console.log("#4 Transaction has been submitted.")
 
     }catch{
         submit_tx_map.set(MODEL_ID, {is_completed: 'true', status: 'UNAUTHORIZED'});
@@ -232,7 +230,7 @@ async function createToken() {
         };
 
         await channel.sendTransaction(orderer_request);
-        //console.log("#3 Transaction has been submitted.")
+        //console.log("#4 Transaction has been submitted.")
 
     }catch{
         //console.log('(Error: Failed to complete the transaction lifecycle procedure. '+
@@ -251,7 +249,6 @@ async function getTag2(tag2, page_size, bookmark){
 async function getTag12(tag1, tag2, page_size, bookmark){
     return await queryAdHoc('{"selector":{"$and":[{"tag1":"' + tag1 + '"},{"tag2":"' + tag2 + '"}]}}', page_size, bookmark);
 }
-
 
 async function setupTxListener(tx_id_string, type) {
 
@@ -278,7 +275,7 @@ async function setupTxListener(tx_id_string, type) {
                 submit_tx_map.set(MODEL_ID, {is_completed: 'true', status: 'VALID'});
             } 
             
-           console.log(JSON.stringify(response));
+           //console.log(JSON.stringify(response));
         },
             // 3. Callback for errors
             (err) => {
@@ -361,28 +358,37 @@ app.put('/submit', async function (req, res, next){
         res.status(400).send({'message':'Bad Request Error: Property "token" is missing from request body.'});
         return
     }
+    TOKEN = req.body.token;
+ 
 
-    if (!req.body.hasOwnProperty('model')){
-        res.status(400).send({'message':'Bad Request Error: Property "model_id" is missing from request body.'});
-        return
-    }else if (!req.body.model.hasOwnProperty('id') || !req.body.model.hasOwnProperty('tag1')
-            || !req.body.model.hasOwnProperty('tag2') || !req.body.model.hasOwnProperty('serialized_data')){
-        res.status(400).send({'message':'Bad Request Error: One of the following model properties is missing from the request body'+
-                                ': "id", "tag1", "tag2", "serialized_data".'});
+    if (!req.body.hasOwnProperty('data')){
+        res.status(400).send({'message':'Bad Request Error: Property "data" is missing from request body.'});
         return
     }
+    if (!req.body.data.hasOwnProperty('id') || !req.body.data.hasOwnProperty('tag1')
+        || !req.body.data.hasOwnProperty('tag2') || !req.body.data.hasOwnProperty('serialization_encoding')
+        || !req.body.data.hasOwnProperty('model') || !req.body.data.hasOwnProperty('weights')
+        || !req.body.data.hasOwnProperty('initialization') || !req.body.data.hasOwnProperty('checkpoints')){
+        res.status(400).send({'message':'Bad Request Error: Ensure all the required json properties are provided.'});
+        return
+    }
+    MODEL_ID = req.body.data.id;
 
-    TOKEN = req.body.token;
-    MODEL_ID = req.body.model.id;
-    TAG1 = req.body.model.tag1;
-    TAG2 = req.body.model.tag2;
-    MODEL_STR = req.body.model.serialized_data;
+    var Tx = {};
+    Tx.tag1 = req.body.data.tag1;
+    Tx.tag2 = req.body.data.tag2;
+    Tx.serialization_encoding = req.body.data.serialization_encoding;
+    Tx.model = req.body.data.model;
+    Tx.weights = req.body.data.weights;
+    Tx.initialization = req.body.data.initialization;
+    Tx.checkpoints = req.body.data.checkpoints;
     
     try {
         submit_tx_map.set(MODEL_ID, {is_completed: 'false', status: 'PENDING'});
+        await submitModel(MODEL_ID, Tx);
         res.status(200).send({'message':'OK'});
-        await submitModel(MODEL_ID, TAG1, TAG2, MODEL_STR);
     }catch(e){
+        console.log(e);
         submit_tx_map.set(MODEL_ID, {is_completed: 'false', status: 'ERROR'});
         res.status(500).send({'message':'Internal Server Error: Failed to submit model ' + MODEL_ID + '.'});
         return

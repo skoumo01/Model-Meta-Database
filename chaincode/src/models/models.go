@@ -16,9 +16,23 @@ type SimpleChaincode struct {
 }
 
 type ModelData struct {
-	Tag1            string `json:"tag1"`
-	Tag2            string `json:"tag2"`
-	SerializedModel string `json:"serialized_model"`
+	Tag1                  string                   `json:"tag1"`
+	Tag2                  string                   `json:"tag2"`
+	SerializationEncoding string                   `json:"serialization_encoding"`
+	Model                 []*GenericSerializedData `json:"model"`
+	Weights               []*GenericSerializedData `json:"weights"`
+	Initialization        []*GenericSerializedData `json:"initialization"`
+	Checkpoints           []*GenericSerializedData `json:"checkpoints"`
+}
+
+type GenericSerializedData struct {
+	Meta           Metadata `json:"metadata"`
+	SerializedData string   `json:"serialized_data"`
+}
+
+type Metadata struct {
+	Identifier     string `json:"identifier"`
+	OriginalFormat string `json:"original_format"`
 }
 
 type ModelDataWrapper struct {
@@ -61,7 +75,8 @@ func (t *SimpleChaincode) CheckClientToken(ctx contractapi.TransactionContextInt
 }
 
 // Initializes a new model in the ledger: OK
-func (t *SimpleChaincode) SubmitModelEntry(ctx contractapi.TransactionContextInterface, token, modelID, tag1, tag2, serializedModel string) error {
+func (t *SimpleChaincode) SubmitModelEntry(ctx contractapi.TransactionContextInterface,
+	token, modelID, entryString string) error {
 
 	tokenBytes, err := ctx.GetStub().GetState(token)
 	if err != nil {
@@ -72,17 +87,18 @@ func (t *SimpleChaincode) SubmitModelEntry(ctx contractapi.TransactionContextInt
 		return fmt.Errorf("authorization not granded: token %s is invalid", token)
 	}
 
-	model := &ModelData{
-		Tag1:            tag1,
-		Tag2:            tag2,
-		SerializedModel: serializedModel,
+	var entry ModelData
+	err = json.Unmarshal([]byte(entryString), &entry)
+	if err != nil {
+		return fmt.Errorf("failed to process json data; ensure correct structure")
 	}
-	modelBytes, err := json.Marshal(model)
+
+	entryBytes, err := json.Marshal(entry)
 	if err != nil {
 		return err
 	}
 
-	err = ctx.GetStub().PutState(modelID, modelBytes)
+	err = ctx.GetStub().PutState(modelID, entryBytes)
 	if err != nil {
 		return err
 	}

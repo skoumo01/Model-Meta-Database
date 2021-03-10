@@ -97,11 +97,22 @@ async function main() {
     if (FUNCTION_CALL==='submitModel'){
         //generate pseudo model data
         var Tx = {};
-        Tx.model_id = MODEL_ID;
         Tx.tag1 = TAG1;
         Tx.tag2 = TAG2;
-        Tx.serialized_model = MODEL_STR; //generateBase64String(4688);
+        Tx.serialization_encoding = "base64";
         
+        var generic = {};
+        var metadata = {}
+        metadata.identifier = "id";
+        metadata.original_format = "format";
+        generic.metadata = metadata;
+        generic.serialized_data = "string";
+
+        Tx.model = [generic, generic];
+        Tx.weights = [generic];
+        Tx.initialization = [];
+        Tx.checkpoints = [generic, generic];
+
         //simple POST
         submitModel(Tx);
 
@@ -147,17 +158,19 @@ async function submitModel(tx_data) {
     var tx_id = client.newTransactionID();
     let tx_id_string = tx_id.getTransactionID();
     
+    console.log();
+
     var request = {
         targets: peerName,
         chaincodeId: CHAINCODE_ID,
         fcn: 'SubmitModelEntry',
-        args: [TOKEN, tx_data.model_id, tx_data.tag1, tx_data.tag2, tx_data.serialized_model],
+        args: [TOKEN, MODEL_ID, JSON.stringify(tx_data)],
         chainId: CHANNEL_NAME,
         txId: tx_id
     };
 
 
-    //console.log("#1 Transaction proposal successfully sent to channel.")
+    console.log("#1 Transaction proposal successfully sent to channel.")
     try{
         let results = await channel.sendTransactionProposal(request);
         
@@ -172,16 +185,16 @@ async function submitModel(tx_data) {
             if (proposalResponses && proposalResponses[i].response &&
                 proposalResponses[i].response.status === 200) {
                 good = true;
-                //console.log(`\tChaincode invocation proposal response #${i} was good`);
+                console.log(`\tChaincode invocation proposal response #${i} was good`);
             } else {
-                //console.log(`\tChaincode invocation proposal response #${i} was bad!`);
+                console.log(`\tChaincode invocation proposal response #${i} was bad!`);
             }
             all_good = all_good & good
         }
-        //console.log("#2 Looped through the proposal responses all_good=", all_good)
+        console.log("#2 Looped through the proposal responses all_good=", all_good)
 
         await setupTxListener(tx_id_string)
-        //console.log('#3 Registered the Tx Listener')
+        console.log('#3 Registered the Tx Listener')
 
         var orderer_request = {
             txId: tx_id,
@@ -190,7 +203,7 @@ async function submitModel(tx_data) {
         };
 
         await channel.sendTransaction(orderer_request);
-        //console.log("#3 Transaction has been submitted.")
+        console.log("#4 Transaction has been submitted.")
 
     }catch{
         //console.log('(Error: Failed to complete the transaction lifecycle procedure. '+
@@ -363,9 +376,9 @@ async function setupTxListener(tx_id_string) {
             response.status = 'VALID';          
             response.blocknumber = block_num;
         
-            //console.log("#5 Received Tx Event")
-            //console.log('The chaincode invoke chaincode transaction has been committed on peer %s', event_hub.getPeerAddr());
-            //console.log('Transaction %s is in block %s', tx, block_num);
+            console.log("#5 Received Tx Event")
+            console.log('The chaincode invoke chaincode transaction has been committed on peer %s', event_hub.getPeerAddr());
+            console.log('Transaction %s is in block %s', tx, block_num);
             
             if (code !== 'VALID') {
                 response.status = 'INVALID';
