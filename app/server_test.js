@@ -1,6 +1,8 @@
 'use strict';
 const express = require('express');
 const execFile = require('child_process').execFile;
+const http = require('http')
+const fs = require('fs')
 const HashMap = require('hashmap');
 var app = express();
 var submit_tx_map = new HashMap();
@@ -657,21 +659,345 @@ app.get("/history", async function(req, res, next){
 
 async function main() {
    
-    //establish blockchain connection
     client = await setupClient();
     channel = await setupChannel();
 
-    //start REST server
-    var server = app.listen(3000, function () {
-        var host = server.address().address
-        var port = server.address().port
-        console.log("Example app listening at http://%s:%s", host, port)
-    });
+    let shard1 = fs.readFileSync('./data/TF/TFjs/group1-shard1of3.bin', {encoding: 'base64'});
+	let shard2 = fs.readFileSync('./data/TF/TFjs/group1-shard2of3.bin', {encoding: 'base64'});
+	let shard3 = fs.readFileSync('./data/TF/TFjs/group1-shard3of3.bin', {encoding: 'base64'});
+	let model = fs.readFileSync('./data/TF/TFjs/model.json', {encoding: 'base64'});
+	
+    MODEL_ID = "id_11";
+    TOKEN = "token";
+    var Tx = {};
+    Tx.tag1 = "tag1";
+    Tx.tag2 = "tag2";
+    Tx.serialization_encoding = "base64"; //4MB x8, 0.7MB
+    Tx.model = [
+            {
+                "metadata":
+                {
+                    "identifier":"group1-shard1of3",
+                    "original_format":"bin"
+                },
+                "serialized_data": shard1
+            },
+            {
+                "metadata":
+                {
+                    "identifier":"group1-shard1of3",
+                    "original_format":"bin"
+                },
+                "serialized_data": shard1
+            },
+            {
+                "metadata":
+                {
+                    "identifier":"group1-shard1of3",
+                    "original_format":"bin"
+                },
+                "serialized_data": shard1
+            },
+            {
+                "metadata":
+                {
+                    "identifier":"group1-shard2of3",
+                    "original_format":"bin"
+                },
+                "serialized_data": shard2
+            },
+            {
+                "metadata":
+                {
+                    "identifier":"group1-shard3of3",
+                    "original_format":"bin"
+                },
+                "serialized_data": shard3
+            },
+            {
+                "metadata":
+                {
+                    "identifier":"group1-shard4of3",
+                    "original_format":"bin"
+                },
+                "serialized_data": shard3
+            },
+            {
+                "metadata":
+                {
+                    "identifier":"group1-shard5of3",
+                    "original_format":"bin"
+                },
+                "serialized_data": shard3
+            },
+            {
+                "metadata":
+                {
+                    "identifier":"group1-shard6of3",
+                    "original_format":"bin"
+                },
+                "serialized_data": shard3
+            },
+            {
+                "metadata":
+                {
+                    "identifier":"model",
+                    "original_format":"json"
+                },
+                "serialized_data": model
+            }
+        ];
+    Tx.weights = [];
+    Tx.initialization = [];
+    Tx.checkpoints = [];
 
+    await submitModel(MODEL_ID, Tx);
 }
 
 if (require.main === module){
     main();
 }
 
+
+async function tflite_example(){
+	
+	client = await setupClient();
+    channel = await setupChannel();
+
+    let model_tflite = fs.readFileSync('./data/TF/TFLite/lite-model_spice_1.tflite', {encoding: 'base64'});
+	
+    MODEL_ID = "id_00";
+    TOKEN = "token";
+    var Tx = {};
+    Tx.tag1 = "tag1";
+    Tx.tag2 = "tag2";
+    Tx.serialization_encoding = "base64";
+    Tx.model = [{
+            "metadata":
+            {
+                "identifier":"lite-model_spice_1",
+                "original_format":"tflite"
+            },
+            "serialized_data": model_tflite
+        }];
+    Tx.weights = [];
+    Tx.initialization = [];
+    Tx.checkpoints = [];
+
+    await submitModel(MODEL_ID, Tx);
+}
+
+async function tfjs_example(){ 
+
+	client = await setupClient();
+    channel = await setupChannel();
+
+    let shard1 = fs.readFileSync('./data/TF/TFjs/group1-shard1of3.bin', {encoding: 'base64'});
+	let shard2 = fs.readFileSync('./data/TF/TFjs/group1-shard2of3.bin', {encoding: 'base64'});
+	let shard3 = fs.readFileSync('./data/TF/TFjs/group1-shard3of3.bin', {encoding: 'base64'});
+	let model = fs.readFileSync('./data/TF/TFjs/model.json', {encoding: 'base64'});
+	
+    MODEL_ID = "id_01";
+    TOKEN = "token";
+    var Tx = {};
+    Tx.tag1 = "tag1";
+    Tx.tag2 = "tag2";
+    Tx.serialization_encoding = "base64";
+    Tx.model = [
+            {
+                "metadata":
+                {
+                    "identifier":"group1-shard1of3",
+                    "original_format":"bin"
+                },
+                "serialized_data": shard1
+            },
+            {
+                "metadata":
+                {
+                    "identifier":"group1-shard2of3",
+                    "original_format":"bin"
+                },
+                "serialized_data": shard2
+            },
+            {
+                "metadata":
+                {
+                    "identifier":"group1-shard3of3",
+                    "original_format":"bin"
+                },
+                "serialized_data": shard3
+            },
+            {
+                "metadata":
+                {
+                    "identifier":"model",
+                    "original_format":"json"
+                },
+                "serialized_data": model
+            }
+        ];
+    Tx.weights = [];
+    Tx.initialization = [];
+    Tx.checkpoints = [];
+
+    await submitModel(MODEL_ID, Tx);
+}
+
+async function tf_saved_model_example_normal(){// ~90 MB: error: [Channel.js]: sendTransaction - no valid endorsements found
+
+	client = await setupClient();
+    channel = await setupChannel();
+
+    let var1 = fs.readFileSync('./data/TF/SavedModel/normal/variables/variables.data-00000-of-00001', {encoding: 'base64'});
+	let var2 = fs.readFileSync('./data/TF/SavedModel/normal/variables/variables.index', {encoding: 'base64'});
+	let saved_model = fs.readFileSync('./data/TF/SavedModel/normal/saved_model.pb', {encoding: 'base64'});
+
+    MODEL_ID = "id_02";
+    TOKEN = "token";
+    var Tx = {};
+    Tx.tag1 = "tag1";
+    Tx.tag2 = "tag2";
+    Tx.serialization_encoding = "base64";
+    Tx.model = [
+        {
+            "metadata":
+            {
+                "identifier":"saved_model",
+                "original_format":"pb"
+            },
+            "serialized_data": saved_model
+        }
+    ];
+    Tx.weights = [];
+    Tx.initialization = [];
+    Tx.checkpoints = [
+        {
+            "metadata":
+            {
+                "identifier":"variables",
+                "original_format":"data-00000-of-00001"
+            },
+            "serialized_data": var1
+        },
+        {
+            "metadata":
+            {
+                "identifier":"variables",
+                "original_format":"index"
+            },
+            "serialized_data": var2
+        }				
+    ];
+
+    await submitModel(MODEL_ID, Tx);
+}
+
+async function tf_saved_model_example_big(){ // ~400 MB: error: [Channel.js]: sendTransaction - no valid endorsements found
+	
+	client = await setupClient();
+    channel = await setupChannel();
+
+    let vocab = fs.readFileSync('./data/TF/SavedModel/big/assets/vocab.txt', {encoding: 'base64'});
+	let var1 = fs.readFileSync('./data/TF/SavedModel/big/variables/variables.data-00000-of-00001', {encoding: 'base64'});
+	let var2 = fs.readFileSync('./data/TF/SavedModel/big/variables/variables.index', {encoding: 'base64'});
+	let saved_model = fs.readFileSync('./data/TF/SavedModel/big/saved_model.pb', {encoding: 'base64'});
+	let tfhub_module = fs.readFileSync('./data/TF/SavedModel/big/tfhub_module.pb', {encoding: 'base64'});
+
+    MODEL_ID = "id_03";
+    TOKEN = "token";
+    var Tx = {};
+    Tx.tag1 = "tag1";
+    Tx.tag2 = "tag2";
+    Tx.serialization_encoding = "base64";
+    Tx.model = [
+        {
+            "metadata":
+            {
+                "identifier":"saved_model",
+                "original_format":"pb"
+            },
+            "serialized_data": saved_model
+        },
+        {
+            "metadata":
+            {
+                "identifier":"tfhub_module",
+                "original_format":"pb"
+            },
+            "serialized_data": tfhub_module
+        }
+    ];
+    Tx.weights = [];
+    Tx.initialization = [
+        {
+            "metadata":
+            {
+                "identifier":"vocab",
+                "original_format":"txt"
+            },
+            "serialized_data": vocab
+        }
+    ];
+    Tx.checkpoints = [
+        {
+            "metadata":
+            {
+                "identifier":"variables",
+                "original_format":"data-00000-of-00001"
+            },
+            "serialized_data": var1
+        },
+        {
+            "metadata":
+            {
+                "identifier":"variables",
+                "original_format":"index"
+            },
+            "serialized_data": var2
+        }				
+    ];
+
+    await submitModel(MODEL_ID, Tx);
+}
+
+async function darknet_yolo(){ // ~200 MB: error: [Channel.js]: sendTransaction - no valid endorsements found
+	
+    client = await setupClient();
+    channel = await setupChannel();
+
+    let architecture = fs.readFileSync('./data/DarknetYOLO/yolov2-tiny.cfg', {encoding: 'base64'});
+	let weights = fs.readFileSync('./data/DarknetYOLO/yolov2-tiny.weights', {encoding: 'base64'});
+	
+    MODEL_ID = "id_04";
+    TOKEN = "token";
+    var Tx = {};
+    Tx.tag1 = "tag1";
+    Tx.tag2 = "tag2";
+    Tx.serialization_encoding = "base64";
+    Tx.model = [
+        {
+            "metadata":
+            {
+                "identifier":"yolov2-tiny",
+                "original_format":"cfg"
+            },
+            "serialized_data": architecture
+        }
+    ];
+    Tx.weights = [
+        {
+            "metadata":
+            {
+                "identifier":"yolov2-tiny",
+                "original_format":"weights"
+            },
+            "serialized_data": weights
+        }
+    ];
+    Tx.initialization = [];
+    Tx.checkpoints = [];
+
+    await submitModel(MODEL_ID, Tx);
+}
 
