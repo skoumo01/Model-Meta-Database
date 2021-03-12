@@ -5,7 +5,9 @@ const HashMap = require('hashmap');
 var app = express();
 var submit_tx_map = new HashMap();
 var submit_token_map = new HashMap();
+var cors = require('cors');
 
+app.use(cors());
 app.use(express.json({limit: '500mb'}));
 app.use(express.urlencoded({limit: '500mb', extended: true }));
 
