@@ -24,7 +24,6 @@ var TOKEN = '';
 var MODEL_ID = '';    
 var TAG1 = '';
 var TAG2 = '';
-var IS_BOUNDED = '';
 var MIN_TIMESTAMP = '';
 var MAX_TIMESTAMP = '';
 var PAGE_SIZE = '';
@@ -127,7 +126,7 @@ async function getLatest(model_id) {
      
 }
 
-async function getHistory(model_id, is_bounded, min_timestamp, max_timestamp) {
+async function getHistory(model_id, min_timestamp, max_timestamp) {
 
     let peerName = channel.getChannelPeer(PEER_NAME)
 
@@ -135,7 +134,7 @@ async function getHistory(model_id, is_bounded, min_timestamp, max_timestamp) {
          targets: peerName,
          chaincodeId: CHAINCODE_ID,
          fcn: 'GetVersionRange',
-         args: [TOKEN, model_id, is_bounded, min_timestamp, max_timestamp]
+         args: [TOKEN, model_id, min_timestamp, max_timestamp]
      };
 
      // send the query proposal to the peer
@@ -149,6 +148,10 @@ async function getHistory(model_id, is_bounded, min_timestamp, max_timestamp) {
 }
 
 async function queryAdHoc(query_string, page_size, bookmark) {
+
+    if (bookmark === "''" || bookmark === '""'){
+        bookmark = '';
+    }
 
     let peerName = channel.getChannelPeer(PEER_NAME)
 
@@ -493,7 +496,7 @@ app.get("/latest/tags", async function(req, res, next){
                                             +' is invalid'});
                     return
                 }         
-                results = {"records" : []};
+                results = [];
             }
             res.status(200).send(results);
         }catch(e){
@@ -538,7 +541,7 @@ app.get("/latest/tags/tag1", async function(req, res, next){
                                             +' is invalid'});
                     return
                 }         
-                results = {"records" : []};
+                results = [];
             }
             res.status(200).send(results);
         }catch(e){
@@ -583,7 +586,7 @@ app.get("/latest/tags/tag2",async function(req, res, next){
                                             +' is invalid'});
                     return
                 }         
-                results = {"records" : []};
+                results = [];
             }
             res.status(200).send(results);
         }catch(e){
@@ -605,38 +608,30 @@ app.get("/history", async function(req, res, next){
             return
     }
     
-    if (!req.query.hasOwnProperty('id') || !req.query.hasOwnProperty('bounded')){        
-        res.status(400).send({'message':'Bad Request Error: Ensure  valid "page_size" and "bookmark" query' +
-                                ' parameters are provided.'});
+    if (!req.query.hasOwnProperty('id')){        
+        res.status(400).send({'message':'Bad Request Error: Ensure query parameter "id" is provided.'});
             return
     }
 
     TOKEN = req.query.token;
     MODEL_ID = req.query.id;
-    IS_BOUNDED = req.query.bounded;
-    if (!(IS_BOUNDED === 'true') && !(IS_BOUNDED === 'false')){
-        res.status(400).send({'message':'Bad Request Error: Invalid assignment to property "bounded".\nMust provide "true" or "false".'});
+   
+    if (!req.query.hasOwnProperty('min') || !req.query.hasOwnProperty('max')){
+        res.status(400).send({'message':'Bad Request Error: Query arameters "min" and/or "max" is/are missing.'});
         return
     }
-
-
-    if (IS_BOUNDED === 'true'){
-        if (!req.query.hasOwnProperty('min') || !req.query.hasOwnProperty('max')){
-            res.status(400).send({'message':'Bad Request Error: Query arameters "min" and/or "max" is/are missing.'});
-            return
-        }
-        MIN_TIMESTAMP = req.query.min;
-        MAX_TIMESTAMP = req.query.max;
-        if (isNaN(MIN_TIMESTAMP) || isNaN(MAX_TIMESTAMP) || (parseInt(MAX_TIMESTAMP, 10) < parseInt(MIN_TIMESTAMP, 10))
+    MIN_TIMESTAMP = req.query.min;
+    MAX_TIMESTAMP = req.query.max;
+    if (isNaN(MIN_TIMESTAMP) || isNaN(MAX_TIMESTAMP) || (parseInt(MAX_TIMESTAMP, 10) < parseInt(MIN_TIMESTAMP, 10))
              || (parseInt(MAX_TIMESTAMP, 10) <= 0) || (parseInt(MIN_TIMESTAMP, 10) <= 0)){
             res.status(400).send({'message':'Bad Request Error: Invalid assignment to property "min" and/or "max".\n'+
                                 'Must provide a timestamp with an accuracy of seconds.'});
-            return
-        }
+        return
     }
+    
 
     try {          
-        var history = await getHistory(MODEL_ID, IS_BOUNDED, MIN_TIMESTAMP, MAX_TIMESTAMP);
+        var history = await getHistory(MODEL_ID, MIN_TIMESTAMP, MAX_TIMESTAMP);
         try{
             history = JSON.parse(history);
         }catch{

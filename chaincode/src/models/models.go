@@ -135,8 +135,8 @@ func (t *SimpleChaincode) GetLatestVersion(ctx contractapi.TransactionContextInt
 	return &model, nil
 }
 
-// Returns the (un)bounded version history of the requested model: OK
-func (t *SimpleChaincode) GetVersionRange(ctx contractapi.TransactionContextInterface, token, modelID string, isBounded bool, min, max int64) ([]HistoryQueryResult, error) {
+// Returns the bounded version history of the requested model: OK
+func (t *SimpleChaincode) GetVersionRange(ctx contractapi.TransactionContextInterface, token, modelID string, min, max int64) ([]HistoryQueryResult, error) {
 
 	tokenBytes, err := ctx.GetStub().GetState(token)
 	if err != nil {
@@ -181,14 +181,11 @@ func (t *SimpleChaincode) GetVersionRange(ctx contractapi.TransactionContextInte
 			return nil, err
 		}
 
-		if isBounded {
-			bottom := time.Unix(min, 0).Unix()
-			top := time.Unix(max, 0).Unix()
-			time2 := timestamp.Unix()
-
-			if time2 < bottom || time2 >= top {
-				continue
-			}
+		bottom := time.Unix(min, 0).Unix()
+		top := time.Unix(max, 0).Unix()
+		time2 := timestamp.Unix()
+		if time2 < bottom || time2 >= top {
+			continue
 		}
 
 		record := HistoryQueryResult{

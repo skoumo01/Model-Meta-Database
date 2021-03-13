@@ -1,0 +1,511 @@
+swagger: "2.0"
+info:
+  description: "This is the documentation for the meta-database intented for model storing and querying as implemented at [Model-Meta-Database](https://github.com/skoumo01/Model-Meta-Database)."
+  version: "1.0.0"
+  title: "Model Meta-Database"
+  contact:
+    email: "skoumo01@ucy.ac.cy"
+host: "10.16.30.89:3000"
+basePath: "/"
+tags:
+- name: "submit"
+  description: "Submit models"
+- name: "check"
+  description: "Check submission transaction status"
+- name: "latest"
+  description: "Query latest version"
+- name: "history"
+  description: "Retrieve history"
+schemes:
+- "http"
+paths:
+  /submit:
+    put:
+      tags:
+      - "submit"
+      schemes:
+      - "http"
+      summary: "Create or update a model"
+      description: "Creates a new version of model with the specified id. If the model does not exist, it creates it."
+      operationId: "submitModel"
+      consumes:
+      - "application/json"
+      parameters:
+      - in: "body"
+        name: "body"
+        description: "The model data to be submitted."
+        required: true
+        schema:
+          $ref: "#/definitions/Submission"
+      responses:
+        "200":
+          description: "Successfully submitted transaction to blockchain. This does not guarantee that the model has been committed on the blockchain; the transaction has just been successfully send for evaluation by the blockchain network. Returns no error if the provided token is invalid; must use the /check endpoint to find out about the result of the submission transaction."
+          schema:
+            $ref: "#/definitions/OkResponse"
+        "400":
+          description: "Bad Request; one or more of the required json properties have not been provided."
+          schema:
+            $ref: "#/definitions/BadRequestResponse"
+        "500":
+          description: "Internal Server Error."
+          schema:
+            $ref: "#/definitions/InternalServerResponse"
+  /check:
+    get:
+      tags:
+      - "check"
+      summary: "Check the status of the latest model submission transaction"
+      description: "Returns a submission transaction status"
+      operationId: "checkSubmit"
+      produces:
+      - "application/json"
+      parameters:
+      - name: "token"
+        in: "query"
+        description: "The client's blockchain authentication/authorization token."
+        required: true
+        type: "string"
+      - name: "id"
+        in: "query"
+        description: "The model's ID. e.g. 'id_0'"
+        required: true
+        type: "string"
+      responses:
+        "200":
+          description: "Successful Operation."
+          schema:
+            $ref: "#/definitions/Status"
+        "400":
+          description: "Bad Request; one or more of the required properties have not been provided."
+          schema:
+            $ref: "#/definitions/BadRequestResponse"
+        "401":
+          description: "Unauthorized action. The provided client token was checked and deemed invalid."
+          schema:
+            $ref: "#/definitions/AuthorizationErrorResponse"
+        "404":
+          description: "Model not found. This means that there was no previous attempt to submit a model with this specific ID."
+          schema:
+            $ref: "#/definitions/NotFoundResponse"
+        "500":
+          description: "Internal Server Error."
+          schema:
+            $ref: "#/definitions/InternalServerResponse"
+  /latest/model:
+    get:
+      tags:
+      - "latest"
+      summary: "Query the latest version of a model"
+      description: ""
+      operationId: "latestModelVersion"
+      produces:
+      - "application/json"
+      parameters:
+      - name: "token"
+        in: "query"
+        description: "The client's blockchain authentication/authorization token."
+        required: true
+        type: "string"
+      - name: "id"
+        in: "query"
+        description: "The model's ID. e.g. 'id_0'"
+        required: true
+        type: "string"
+      responses:
+        "200":
+          description: "Successfully retrieved model from blockchain."
+          schema:
+            $ref: "#/definitions/Data"
+        "400":
+          description: "Bad Request; one or more of the required properties have not been provided."
+          schema:
+            $ref: "#/definitions/BadRequestResponse"
+        "401":
+          description: "Unauthorized action. The provided client token was checked and deemed invalid."
+          schema:
+            $ref: "#/definitions/AuthorizationErrorResponse"
+        "404":
+          description: "Model not found. This means that there was no previous attempt to submit a model with this specific ID."
+          schema:
+            $ref: "#/definitions/NotFoundResponse"
+        "500":
+          description: "Internal Server Error."
+          schema:
+            $ref: "#/definitions/InternalServerResponse"
+  /latest/tags:
+    get:
+      tags:
+      - "latest"
+      summary: "Query the latest version of the models by 2 tags"
+      description: ""
+      operationId: "tagsQuery"
+      produces:
+      - "application/json"
+      parameters:
+      - name: "token"
+        in: "query"
+        description: "The client's blockchain authentication/authorization token."
+        required: true
+        type: "string"
+      - name: "page_size"
+        in: "query"
+        description: "The max number of models to retrieve"
+        required: true
+        type: "string"
+      - name: "bookmark"
+        in: "query"
+        description: "The query bookmark to use. The provided bookmark determines which query-result page to retrieve. e.g. To retrieve all the data in a result set of 10 models using page_size=3 the user needs to initially provide an empty bookmark, and (in subsequent calls) the bookmark string returned by the previous call to this endpoint; a total of 4 calls for this example."
+        required: true
+        type: "string"
+        example: "''"
+      - name: "tag1"
+        in: "query"
+        description: "The desired value for the tag1 query field"
+        required: true
+        type: "string"
+      - name: "tag2"
+        in: "query"
+        description: "The desired value for the tag2 query field"
+        required: true
+        type: "string"
+      responses:
+        "200":
+          description: "The tag query has been successfully carried out."
+          schema:
+            $ref: "#/definitions/QueryResults"
+        "400":
+          description: "Bad Request; one or more of the required properties have not been provided."
+          schema:
+            $ref: "#/definitions/BadRequestResponse"
+        "401":
+          description: "Unauthorized action. The provided client token was checked and deemed invalid."
+          schema:
+            $ref: "#/definitions/AuthorizationErrorResponse"
+        "500":
+          description: "Internal Server Error: Failed to execute tag query."
+          schema:
+            $ref: "#/definitions/InternalServerResponse"
+  /latest/tags/tag1:
+    get:
+      tags:
+      - "latest"
+      summary: "Query the latest version of the models by tag1"
+      description: ""
+      operationId: "tag1Query"
+      produces:
+      - "application/json"
+      parameters:
+      - name: "token"
+        in: "query"
+        description: "The client's blockchain authentication/authorization token."
+        required: true
+        type: "string"
+      - name: "page_size"
+        in: "query"
+        description: "The max number of models to retrieve"
+        required: true
+        type: "string"
+      - name: "bookmark"
+        in: "query"
+        description: "The query bookmark to use. The provided bookmark determines which query-result page to retrieve. e.g. To retrieve all the data in a result set of 10 models using page_size=3 the user needs to initially provide an empty bookmark, and (in subsequent calls) the bookmark string returned by the previous call to this endpoint; a total of 4 calls for this example."
+        required: true
+        type: "string"
+        example: "''"
+      - name: "tag1"
+        in: "query"
+        description: "The desired value for the tag1 query field"
+        required: true
+        type: "string"
+      responses:
+        "200":
+          description: "The tag query has been successfully carried out."
+          schema:
+            $ref: "#/definitions/QueryResults"
+        "400":
+          description: "Bad Request; one or more of the required properties have not been provided."
+          schema:
+            $ref: "#/definitions/BadRequestResponse"
+        "401":
+          description: "Unauthorized action. The provided client token was checked and deemed invalid."
+          schema:
+            $ref: "#/definitions/AuthorizationErrorResponse"
+        "500":
+          description: "Internal Server Error: Failed to execute tag query."
+          schema:
+            $ref: "#/definitions/InternalServerResponse"
+  /latest/tags/tag2:
+    get:
+      tags:
+      - "latest"
+      summary: "Query the latest version of the models by tag2"
+      description: ""
+      operationId: "tag2Query"
+      produces:
+      - "application/json"
+      parameters:
+      - name: "token"
+        in: "query"
+        description: "The client's blockchain authentication/authorization token."
+        required: true
+        type: "string"
+      - name: "page_size"
+        in: "query"
+        description: "The max number of models to retrieve"
+        required: true
+        type: "string"
+      - name: "bookmark"
+        in: "query"
+        description: "The query bookmark to use. The provided bookmark determines which query-result page to retrieve. e.g. To retrieve all the data in a result set of 10 models using page_size=3 the user needs to initially provide an empty bookmark, and (in subsequent calls) the bookmark string returned by the previous call to this endpoint; a total of 4 calls for this example."
+        required: true
+        type: "string"
+        example: "''"
+      - name: "tag2"
+        in: "query"
+        description: "The desired value for the tag2 query field"
+        required: true
+        type: "string"
+      responses:
+        "200":
+          description: "The tag query has been successfully carried out."
+          schema:
+            $ref: "#/definitions/QueryResults"
+        "400":
+          description: "Bad Request; one or more of the required properties have not been provided."
+          schema:
+            $ref: "#/definitions/BadRequestResponse"
+        "401":
+          description: "Unauthorized action. The provided client token was checked and deemed invalid."
+          schema:
+            $ref: "#/definitions/AuthorizationErrorResponse"
+        "500":
+          description: "Internal Server Error: Failed to execute tag query."
+          schema:
+            $ref: "#/definitions/InternalServerResponse"
+  /history:
+    get:
+      tags:
+      - "history"
+      summary: "Query the version history of a model"
+      description: "Retrieves the successfully commited (on the blockchain) versions of a model within the specified (in seconds) time-bounds."
+      operationId: "getHistory"
+      produces:
+      - "application/json"
+      parameters:
+      - name: "token"
+        in: "query"
+        description: "The client's blockchain authentication/authorization token."
+        required: true
+        type: "string"
+      - name: "id"
+        in: "query"
+        description: "The model's ID (e.g. id_0)."
+        required: true
+        type: "string"
+      - name: "min"
+        in: "query"
+        description: "The low bound for the history query in seconds."
+        required: true
+        type: "string"
+      - name: "max"
+        in: "query"
+        description: "The upper bound for the history query in seconds."
+        required: true
+        type: "string"
+      responses:
+        "200":
+          description: "The history query has been successfully carried out. If there is no model with the specified id, the returned result array is empty."
+          schema:
+            $ref: "#/definitions/HistoryQueryResults"
+        "400":
+          description: "Bad Request; one or more of the required properties have not been provided."
+          schema:
+            $ref: "#/definitions/BadRequestResponse"
+        "401":
+          description: "Unauthorized action. The provided client token was checked and deemed invalid."
+          schema:
+            $ref: "#/definitions/AuthorizationErrorResponse"
+        "500":
+          description: "Internal Server Error: Failed to execute tag query."
+          schema:
+            $ref: "#/definitions/InternalServerResponse"
+definitions:
+  Submission:
+    type: "object"
+    required:
+    - "organization"
+    - "user"
+    - "peername"
+    - "channel"
+    - "contract"
+    - "model"
+    properties:
+      token:
+        type: "string"
+        example: "token"
+      data:
+        $ref: "#/definitions/DataWrapper"
+  OkResponse:
+    type: "object"
+    properties:
+      message:
+        type: "string"
+    example:
+      message: "OK"
+  BadRequestResponse:
+    type: "object"
+    properties:
+      message:
+        type: "string"
+    example:
+      message: "Bad Request Error: Ensure all the required properties are provided."
+  NotFoundResponse:
+    type: "object"
+    properties:
+      message:
+        type: "string"
+    example:
+      message: "Not Found: Model with id 'id_4' does not exist."
+  InternalServerResponse:
+    type: "object"
+    properties:
+      message:
+        type: "string"
+    example:
+      message: "Internal Server Error."
+  AuthorizationErrorResponse:
+    type: "object"
+    properties:
+      message:
+        type: "string"
+    example:
+      message: "Unauthorized: authorization not granded: token 'token' is invalid."
+  Status:
+    type: "object"
+    properties:
+      is_completed:
+        type: "string"
+        enum: [true, false]
+        description: >
+          :
+           * `true` - Transaction complete
+           * `false` - Transaction incomplete
+      status:
+        type: "string"
+        enum: [VALID, INVALID, PENDING, ERROR, UNAUTHORIZED]
+        description: >
+          status order:
+           * `VALID` - The model has been successfully been committed to the blockchain.
+           * `INVALID` - Blockchain peers rejected the transaction even though client token was valid.
+           * `PENDING` - Transaction still in progress.
+           * `ERROR` - Internal Server Error failure.
+           * `UNAUTHORIZED` - The provided token was invalid; unauthorized client.
+    example:
+      is_completed: "true"
+      status: "VALID"
+  QueryResults:
+    type: "object"
+    properties:
+      records:
+        type: "array"
+        items:
+          type: "object"
+          properties:
+            Key:
+              type: "string"
+              example: "id_0"
+            Value:
+              type: "object"
+              $ref: "#/definitions/Data"
+      fetchedRecordsCount:
+        type: "integer"
+        example: 3
+      bookmark:
+        type: "string"
+        example: ""
+  HistoryQueryResults:
+    type: "array"
+    items:
+      type: "object"
+      properties:
+        record:
+          type: "object"
+          $ref: "#/definitions/Data"
+        timestamp:
+          type: "string"
+          example: "2021-03-03T07:18:45.19Z"
+  GenericFile:
+    type: "object"
+    properties:
+      metadata:
+        type: "object"
+        properties:
+          identifier:
+            type: "string"
+          original_format:
+            type: "string"
+      serialized_data:
+        type: "string"
+        example: "string"
+  Data:
+    type: "object"
+    properties:
+      tag1:
+        type: "string"
+        example: "tag1"
+      tag2:
+        type: "string"
+        example: "tag2"
+      serialization_encoding:
+        type: "string"
+        example: "base64"
+      model:
+        type: "array"
+        items:
+          $ref: "#/definitions/GenericFile"
+      weights:
+        type: "array"
+        items:
+          $ref: "#/definitions/GenericFile"
+      initialization:
+        type: "array"
+        items:
+          $ref: "#/definitions/GenericFile"
+        example: []
+      checkpoints:
+        type: "array"
+        items:
+          $ref: "#/definitions/GenericFile"
+        example: []
+  DataWrapper:
+    type: "object"
+    properties:
+      id:
+        type: "string"
+        example: "id_0"
+      tag1:
+        type: "string"
+        example: "tag1"
+      tag2:
+        type: "string"
+        example: "tag2"
+      serialization_encoding:
+        type: "string"
+        example: "base64"
+      model:
+        type: "array"
+        items:
+          $ref: "#/definitions/GenericFile"
+      weights:
+        type: "array"
+        items:
+          $ref: "#/definitions/GenericFile"
+      initialization:
+        type: "array"
+        items:
+          $ref: "#/definitions/GenericFile"
+        example: []
+      checkpoints:
+        type: "array"
+        items:
+          $ref: "#/definitions/GenericFile"
+        example: []
