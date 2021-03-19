@@ -1,6 +1,9 @@
 swagger: "2.0"
 info:
-  description: "This is the documentation for the meta-database intented for model storing and querying as implemented at [Model-Meta-Database](https://github.com/skoumo01/Model-Meta-Database)."
+  description: "This is the documentation for the meta-database intented for model storing and querying as implemented at [Model-Meta-Database](https://github.com/skoumo01/Model-Meta-Database).
+  
+  
+    Note: For the following endpoints the (valid) token 'token' can be used. This is for demonstration purposes only."
   version: "1.0.0"
   title: "Model Meta-Database"
   contact:

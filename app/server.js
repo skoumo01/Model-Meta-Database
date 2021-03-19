@@ -245,13 +245,13 @@ async function createToken() {
 }
 
 async function getTag1(tag1, page_size, bookmark){
-    return await queryAdHoc('{"selector":{"tag1":"' + tag1 + '"}}', page_size, bookmark);
+    return await queryAdHoc('{"selector":{"tag1":"' + tag1 + '"}, "use_index":["_design/indexTag1", "indexTag1"]}', page_size, bookmark);
 }
 async function getTag2(tag2, page_size, bookmark){
-    return await queryAdHoc('{"selector":{"tag2":"' + tag2 + '"}}', page_size, bookmark);
+    return await queryAdHoc('{"selector":{"tag2":"' + tag2 + '"}, "use_index":["_design/indexTag2", "indexTag2"]}', page_size, bookmark);
 }
 async function getTag12(tag1, tag2, page_size, bookmark){
-    return await queryAdHoc('{"selector":{"$and":[{"tag1":"' + tag1 + '"},{"tag2":"' + tag2 + '"}]}}', page_size, bookmark);
+    return await queryAdHoc('{"selector":{"$and":[{"tag1":"' + tag1 + '"},{"tag2":"' + tag2 + '"}]}, "use_index":["_design/indexTag12", "indexTag12"]}', page_size, bookmark);
 }
 
 async function setupTxListener(tx_id_string, type) {

@@ -32,8 +32,8 @@ function printHelp() {
     println
     println " Examples:"
     println "   network.sh up -c mychannel -db couchdb"
-    println "   network.sh deployCC -c mychannel -ccn contract_rawOne -ccv 1 -ccp ../chaincode/src/rawOne/ -ccl golang"
-    println "   network.sh testCC -c mychannel -ccn contract_rawOne"
+    println "   network.sh deployCC -c mychannel -ccn contract_models -ccv 1 -ccp ../chaincode/src/models/ -ccl golang"
+    println "   network.sh testCC -c mychannel -ccn contract_models"
     println "   network.sh down"
     println
 }

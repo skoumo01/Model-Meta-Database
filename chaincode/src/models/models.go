@@ -270,6 +270,12 @@ func constructQueryResponseFromIterator(resultsIterator shim.StateQueryIteratorI
 }
 
 func (t *SimpleChaincode) Init(ctx contractapi.TransactionContextInterface) error {
+
+	err := ctx.GetStub().PutState("token", []byte{'t', 'o', 'k', 'e', 'n'})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
