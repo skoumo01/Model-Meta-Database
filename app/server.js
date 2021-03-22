@@ -28,6 +28,8 @@ var MIN_TIMESTAMP = '';
 var MAX_TIMESTAMP = '';
 var PAGE_SIZE = '';
 var BOOKMARK = '';
+var LAST = '';
+var LAST_PAGE_ID = '';
 
 // Constants for profile
 const CONNECTION_PROFILE_PATH = './profiles/dev-connect.yaml';
@@ -55,7 +57,8 @@ async function submitModel(model_id, tx_data) {
 
     var tx_id = client.newTransactionID();
     let tx_id_string = tx_id.getTransactionID();
-    
+    LAST_PAGE_ID = tx_id_string;
+
     var request = {
         targets: peerName,
         chaincodeId: CHAINCODE_ID,
@@ -65,7 +68,7 @@ async function submitModel(model_id, tx_data) {
         txId: tx_id
     };
 
-
+    console.log("#0 Transaction id is: " + tx_id_string)
     console.log("#1 Transaction proposal successfully sent to channel.")
     try{
         let results = await channel.sendTransactionProposal(request);
@@ -89,7 +92,7 @@ async function submitModel(model_id, tx_data) {
         }
         console.log("#2 Looped through the proposal responses all_good=", all_good)
 
-        await setupTxListener(tx_id_string, 'model')
+        await setupTxListener(tx_id_string, 'model')//commented out for debugging
         console.log('#3 Registered the Tx Listener')
 
         var orderer_request = {
@@ -286,7 +289,7 @@ async function setupTxListener(tx_id_string, type) {
                 return JSON.stringify({});
                 //console.log(err);
             },
-            { unregister: true, disconnect: true }
+            { unregister: true, disconnect: (true && (LAST === 'true')) }
         );
 
         event_hub.connect();
@@ -658,12 +661,41 @@ async function main() {
     client = await setupClient();
     channel = await setupChannel();
 
+    /*
+    TOKEN = 'token';
+
+    MODEL_ID = 'id_2';
+    var Tx = {};
+    Tx.tag1 = 'tag1';
+    Tx.tag2 = 'tag2';
+    Tx.serialization_encoding = 'serialization_encoding';
+    Tx.model = [];
+    Tx.weights = [];
+    Tx.initialization = [];
+    Tx.checkpoints = [];
+    LAST = 'false';
+    await submitModel(MODEL_ID, Tx);
+
+    MODEL_ID = 'id_3';
+    var meta = {};
+    var metadata ={};
+    metadata.identifier = "id";
+    metadata.original_format = "format";
+    meta.metadata = metadata;
+    meta.serialized_data = "string";
+    Tx.model = [meta];
+    LAST = 'true';
+    await submitModel(MODEL_ID, Tx);
+    */
+
+    
     //start REST server
     var server = app.listen(3000, function () {
         var host = server.address().address
         var port = server.address().port
         console.log("Example app listening at http://%s:%s", host, port)
     });
+    
 
 }
 
