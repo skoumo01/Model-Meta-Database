@@ -3,10 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
-	"github.com/golang/protobuf/ptypes"
-	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
 
@@ -15,42 +12,39 @@ type SimpleChaincode struct {
 	contractapi.Contract
 }
 
-type ModelData struct {
-	Tag1                  string                   `json:"tag1"`
-	Tag2                  string                   `json:"tag2"`
-	SerializationEncoding string                   `json:"serialization_encoding"`
-	Model                 []*GenericSerializedData `json:"model"`
-	Weights               []*GenericSerializedData `json:"weights"`
-	Initialization        []*GenericSerializedData `json:"initialization"`
-	Checkpoints           []*GenericSerializedData `json:"checkpoints"`
+type MetaData struct {
+	ModelID               string   `json:"model_id"`
+	Tag1                  string   `json:"tag1"`
+	Tag2                  string   `json:"tag2"`
+	SerializationEncoding string   `json:"serialization_encoding"`
+	FileCounters          Counters `json:"file_counters"`
 }
 
-type GenericSerializedData struct {
-	Meta           Metadata `json:"metadata"`
-	SerializedData string   `json:"serialized_data"`
+type Counters struct {
+	Model          int `json:"model"`
+	Weights        int `json:"weights"`
+	Initialization int `json:"initialization"`
+	Checkpoints    int `json:"checkpoints"`
 }
 
-type Metadata struct {
-	Identifier     string `json:"identifier"`
-	OriginalFormat string `json:"original_format"`
+type GenericPage struct {
+	ModelID   string    `json:"model_id"`
+	PageID    int       `json:"page_id"`
+	PageBytes int       `json:"page_bytes"` //data+digests
+	Data      []*string `json:"data"`
+	Digests   []*string `json:"digests"`
 }
 
-type ModelDataWrapper struct {
-	Key   string    `json: key`
-	Value ModelData `json: value`
-}
-
-// HistoryQueryResult structure used for returning result of history query
-type HistoryQueryResult struct {
-	Record    *ModelData `json:"record"`
-	Timestamp time.Time  `json:"timestamp"`
+type GenericPageWrapper struct {
+	Key   string      `json: key`
+	Value GenericPage `json: value`
 }
 
 // PaginatedQueryResult structure used for returning paginated query results and metadata
 type PaginatedQueryResult struct {
-	Records             []*ModelDataWrapper `json:"records"`
-	FetchedRecordsCount int32               `json:"fetchedRecordsCount"`
-	Bookmark            string              `json:"bookmark"`
+	Records             []*GenericPageWrapper `json:"records"`
+	FetchedRecordsCount int32                 `json:"fetchedRecordsCount"`
+	Bookmark            string                `json:"bookmark"`
 }
 
 // Creates a new client token using uuid
@@ -74,9 +68,9 @@ func (t *SimpleChaincode) CheckClientToken(ctx contractapi.TransactionContextInt
 	return tokenBytes != nil, nil
 }
 
-// Initializes a new model in the ledger: OK
-func (t *SimpleChaincode) SubmitModelEntry(ctx contractapi.TransactionContextInterface,
-	token, modelID, entryString string) error {
+// Submits a metadata entry to the ledger.
+// Metadata entries have to do with the model's page metadata.
+func (t *SimpleChaincode) SubmitMeta(ctx contractapi.TransactionContextInterface, token, modelID, entryString string) error {
 
 	tokenBytes, err := ctx.GetStub().GetState(token)
 	if err != nil {
@@ -87,7 +81,7 @@ func (t *SimpleChaincode) SubmitModelEntry(ctx contractapi.TransactionContextInt
 		return fmt.Errorf("authorization not granded: token %s is invalid", token)
 	}
 
-	var entry ModelData
+	var entry MetaData
 	err = json.Unmarshal([]byte(entryString), &entry)
 	if err != nil {
 		return fmt.Errorf("failed to process json data; ensure correct structure")
@@ -98,7 +92,7 @@ func (t *SimpleChaincode) SubmitModelEntry(ctx contractapi.TransactionContextInt
 		return err
 	}
 
-	err = ctx.GetStub().PutState(modelID, entryBytes)
+	err = ctx.GetStub().PutState(modelID+"_metadata", entryBytes)
 	if err != nil {
 		return err
 	}
@@ -106,167 +100,37 @@ func (t *SimpleChaincode) SubmitModelEntry(ctx contractapi.TransactionContextInt
 	return nil
 }
 
-// Retrieves a model from the ledger: OK
-func (t *SimpleChaincode) GetLatestVersion(ctx contractapi.TransactionContextInterface, token, modelID string) (*ModelData, error) {
+// Submits a page-data entry to the ledger.
+// Page-data entries have to do with the model's actual data.
+// PpageType can be either of the following: model, weights, initialization, checkpoints
+func (t *SimpleChaincode) SubmitPage(ctx contractapi.TransactionContextInterface, token, modelID, pageType, entryString string) error {
 
 	tokenBytes, err := ctx.GetStub().GetState(token)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve token %s from world state. %v", token, err)
+		return fmt.Errorf("failed to retrieve token %s from world state. %v", token, err)
 	}
 
 	if tokenBytes == nil {
-		return nil, fmt.Errorf("authorization not granded: token %s is invalid", token) //these error msgs can be caught with response.toString().includes('...') form the caller(!)
+		return fmt.Errorf("authorization not granded: token %s is invalid", token)
 	}
 
-	modelBytes, err := ctx.GetStub().GetState(modelID)
+	var entry GenericPage
+	err = json.Unmarshal([]byte(entryString), &entry)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get model %s: %v", modelID, err)
-	}
-	if modelBytes == nil {
-		return nil, fmt.Errorf("model %s does not exist", modelID)
+		return fmt.Errorf("failed to process json data; ensure correct structure")
 	}
 
-	var model ModelData
-	err = json.Unmarshal(modelBytes, &model)
+	entryBytes, err := json.Marshal(entry)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &model, nil
-}
-
-// Returns the bounded version history of the requested model: OK
-func (t *SimpleChaincode) GetVersionRange(ctx contractapi.TransactionContextInterface, token, modelID string, min, max int64) ([]HistoryQueryResult, error) {
-
-	tokenBytes, err := ctx.GetStub().GetState(token)
+	err = ctx.GetStub().PutState(modelID+"_"+pageType, entryBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve token %s from world state. %v", token, err)
+		return err
 	}
 
-	if tokenBytes == nil {
-		return nil, fmt.Errorf("authorization not granded: token %s is invalid", token)
-	}
-
-	//log.Printf("GetModelHistory: ID %v", modelID)
-
-	resultsIterator, err := ctx.GetStub().GetHistoryForKey(modelID)
-	if err != nil {
-		return nil, err
-	}
-	defer resultsIterator.Close()
-
-	var records []HistoryQueryResult
-	for resultsIterator.HasNext() {
-		response, err := resultsIterator.Next()
-		if err != nil {
-			return nil, err
-		}
-
-		var model ModelData
-		if len(response.Value) > 0 {
-			err = json.Unmarshal(response.Value, &model)
-			if err != nil {
-				return nil, err
-			}
-		} else { //pending
-			/*
-				asset = Asset{
-					ID: assetID,
-				}
-			*/
-		}
-
-		timestamp, err := ptypes.Timestamp(response.Timestamp)
-		if err != nil {
-			return nil, err
-		}
-
-		bottom := time.Unix(min, 0).Unix()
-		top := time.Unix(max, 0).Unix()
-		time2 := timestamp.Unix()
-		if time2 < bottom || time2 >= top {
-			continue
-		}
-
-		record := HistoryQueryResult{
-			Timestamp: timestamp,
-			Record:    &model,
-		}
-		records = append(records, record)
-	}
-
-	return records, nil
-}
-
-// QueryModelsWithPagination uses a query string, page size and a bookmark to perform a query
-// for models. Query string matching state database syntax is passed in and executed as is.
-// The number of fetched records would be equal to or lesser than the specified page size.
-// Supports ad hoc queries that can be defined at runtime by the client.
-// Only available on state databases that support rich query (e.g. CouchDB)
-// Paginated queries are only valid for read only transactions.
-// Example: Pagination with Ad hoc Rich Query
-func (t *SimpleChaincode) QueryModelsWithPagination(ctx contractapi.TransactionContextInterface, token, queryString string, pageSize int, bookmark string) (*PaginatedQueryResult, error) {
-	tokenBytes, err := ctx.GetStub().GetState(token)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve token %s from world state. %v", token, err)
-	}
-
-	if tokenBytes == nil {
-		return nil, fmt.Errorf("authorization not granded: token %s is invalid", token)
-	}
-
-	return getQueryResultForQueryStringWithPagination(ctx, queryString, int32(pageSize), bookmark)
-}
-
-// getQueryResultForQueryStringWithPagination executes the passed in query string with
-// pagination info. The result set is built and returned as a byte array containing the JSON results.
-func getQueryResultForQueryStringWithPagination(ctx contractapi.TransactionContextInterface, queryString string, pageSize int32, bookmark string) (*PaginatedQueryResult, error) {
-
-	resultsIterator, responseMetadata, err := ctx.GetStub().GetQueryResultWithPagination(queryString, pageSize, bookmark)
-	if err != nil {
-		return nil, err
-	}
-	defer resultsIterator.Close()
-
-	models, err := constructQueryResponseFromIterator(resultsIterator)
-	if err != nil {
-		return nil, err
-	}
-
-	if models == nil {
-		return nil, nil
-	}
-
-	return &PaginatedQueryResult{
-		Records:             models,
-		FetchedRecordsCount: responseMetadata.FetchedRecordsCount,
-		Bookmark:            responseMetadata.Bookmark,
-	}, nil
-}
-
-// constructQueryResponseFromIterator constructs a slice of models from the resultsIterator
-func constructQueryResponseFromIterator(resultsIterator shim.StateQueryIteratorInterface) ([]*ModelDataWrapper, error) {
-	var models []*ModelDataWrapper
-	for resultsIterator.HasNext() {
-		queryResult, err := resultsIterator.Next()
-		if err != nil {
-			return nil, err
-		}
-
-		var model ModelData
-		err = json.Unmarshal(queryResult.Value, &model)
-		modelwrapper := ModelDataWrapper{
-			Key:   queryResult.Key,
-			Value: model,
-		}
-
-		if err != nil {
-			return nil, err
-		}
-		models = append(models, &modelwrapper)
-	}
-
-	return models, nil
+	return nil
 }
 
 func (t *SimpleChaincode) Init(ctx contractapi.TransactionContextInterface) error {

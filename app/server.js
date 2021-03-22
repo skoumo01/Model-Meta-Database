@@ -29,7 +29,6 @@ var MAX_TIMESTAMP = '';
 var PAGE_SIZE = '';
 var BOOKMARK = '';
 var LAST = '';
-var LAST_PAGE_ID = '';
 
 // Constants for profile
 const CONNECTION_PROFILE_PATH = './profiles/dev-connect.yaml';
@@ -57,7 +56,6 @@ async function submitModel(model_id, tx_data) {
 
     var tx_id = client.newTransactionID();
     let tx_id_string = tx_id.getTransactionID();
-    LAST_PAGE_ID = tx_id_string;
 
     var request = {
         targets: peerName,
