@@ -50,7 +50,7 @@ var client = {}
 // Variable to hold the channel
 var channel = {}
 
-async function submitModel(model_id, tx_data) {
+async function submitMeta(model_id, tx_data) {
 
     let peerName = channel.getChannelPeer(PEER_NAME)
 
@@ -60,7 +60,7 @@ async function submitModel(model_id, tx_data) {
     var request = {
         targets: peerName,
         chaincodeId: CHAINCODE_ID,
-        fcn: 'SubmitModelEntry',
+        fcn: 'SubmitMeta',
         args: [TOKEN, model_id, JSON.stringify(tx_data)],
         chainId: CHANNEL_NAME,
         txId: tx_id
@@ -110,6 +110,144 @@ async function submitModel(model_id, tx_data) {
 
 }
 
+async function submitPage(model_id, tx_data) {
+
+    let peerName = channel.getChannelPeer(PEER_NAME)
+
+    var tx_id = client.newTransactionID();
+    let tx_id_string = tx_id.getTransactionID();
+
+    var request = {
+        targets: peerName,
+        chaincodeId: CHAINCODE_ID,
+        fcn: 'SubmitPage',
+        args: [TOKEN, model_id, JSON.stringify(tx_data)],
+        chainId: CHANNEL_NAME,
+        txId: tx_id
+    };
+
+    console.log("#0 Transaction id is: " + tx_id_string)
+    console.log("#1 Transaction proposal successfully sent to channel.")
+    try{
+        let results = await channel.sendTransactionProposal(request);
+        
+        // Array of proposal responses
+        var proposalResponses = results[0];
+
+        var proposal = results[1];
+
+        var all_good = true;
+        for (var i in proposalResponses) {
+            let good = false
+            if (proposalResponses && proposalResponses[i].response &&
+                proposalResponses[i].response.status === 200) {
+                good = true;
+                console.log(`\tChaincode invocation proposal response #${i} was good`);
+            } else {
+                console.log(`\tChaincode invocation proposal response #${i} was bad!`);
+            }
+            all_good = all_good & good
+        }
+        console.log("#2 Looped through the proposal responses all_good=", all_good)
+
+        await setupTxListener(tx_id_string, 'model')//commented out for debugging
+        console.log('#3 Registered the Tx Listener')
+
+        var orderer_request = {
+            txId: tx_id,
+            proposalResponses: proposalResponses,
+            proposal: proposal
+        };
+
+        await channel.sendTransaction(orderer_request);
+        console.log("#4 Transaction has been submitted.")
+
+    }catch{
+        submit_tx_map.set(MODEL_ID, {is_completed: 'true', status: 'UNAUTHORIZED'});
+        return
+    }
+    
+
+}
+
+async function getLastModel(page_size, bookmark) {
+
+    if (bookmark === "''" || bookmark === '""'){
+        bookmark = '';
+    }
+
+    let peerName = channel.getChannelPeer(PEER_NAME)
+
+    let request = {
+         targets: peerName,
+         chaincodeId: CHAINCODE_ID,
+         fcn: 'QueryLatestModelWithPagination',
+         args: [TOKEN, MODEL_ID, page_size.toString(), bookmark]
+     };
+
+     // send the query proposal to the peer
+    let response = await channel.queryByChaincode(request);
+    console.log(response.toString());
+    //return response.toString();
+
+}
+
+async function getMeta() {
+
+    let peerName = channel.getChannelPeer(PEER_NAME)
+
+    let request = {
+         targets: peerName,
+         chaincodeId: CHAINCODE_ID,
+         fcn: 'QueryMetaData',
+         args: [TOKEN, MODEL_ID]
+     };
+
+    // send the query proposal to the peer
+    var response = await channel.queryByChaincode(request);
+    console.log(response.toString());
+    //return response.toString();
+     
+}
+
+async function queryAdHocMeta(query_string, page_size, bookmark) {
+
+    if (bookmark === "''" || bookmark === '""'){
+        bookmark = '';
+    }
+
+    let peerName = channel.getChannelPeer(PEER_NAME)
+
+    let request = {
+         targets: peerName,
+         chaincodeId: CHAINCODE_ID,
+         fcn: 'QueryMetaDataWithPagination',
+         args: [TOKEN, query_string, page_size.toString(), bookmark]
+     };
+
+     // send the query proposal to the peer
+    let response = await channel.queryByChaincode(request);
+    return response.toString();
+
+}
+
+async function getTag1Meta(tag1, page_size, bookmark){
+    let res = await queryAdHocMeta('{"selector":{"tag1":"' + tag1 + '"}, "use_index":["_design/indexTag1", "indexTag1"]}', page_size, bookmark);
+    console.log(res);
+    //return res
+}
+async function getTag2Meta(tag2, page_size, bookmark){
+    let res = await queryAdHocMeta('{"selector":{"tag2":"' + tag2 + '"}, "use_index":["_design/indexTag2", "indexTag2"]}', page_size, bookmark);
+    console.log(res);
+    //return res
+}
+async function getTag12Meta(tag1, tag2, page_size, bookmark){
+    let res = await queryAdHocMeta('{"selector":{"$and":[{"tag1":"' + tag1 + '"},{"tag2":"' + tag2 + '"}]}, "use_index":["_design/indexTag12", "indexTag12"]}', page_size, bookmark);
+    console.log(res);
+    //return res
+}
+
+/*
 async function getLatest(model_id) {
 
     let peerName = channel.getChannelPeer(PEER_NAME)
@@ -127,47 +265,6 @@ async function getLatest(model_id) {
      
 }
 
-async function getHistory(model_id, min_timestamp, max_timestamp) {
-
-    let peerName = channel.getChannelPeer(PEER_NAME)
-
-    let request = {
-         targets: peerName,
-         chaincodeId: CHAINCODE_ID,
-         fcn: 'GetVersionRange',
-         args: [TOKEN, model_id, min_timestamp, max_timestamp]
-     };
-
-     // send the query proposal to the peer
-    let response = await channel.queryByChaincode(request);
-    if (response.toString() === 'false'){
-        throw new Error('Error: error in simulation: transaction returned with failure: Error: The Model ' + model_id + ' does not exist');
-    }else{
-        return response.toString();
-    }
- 
-}
-
-async function queryAdHoc(query_string, page_size, bookmark) {
-
-    if (bookmark === "''" || bookmark === '""'){
-        bookmark = '';
-    }
-
-    let peerName = channel.getChannelPeer(PEER_NAME)
-
-    let request = {
-         targets: peerName,
-         chaincodeId: CHAINCODE_ID,
-         fcn: 'QueryModelsWithPagination',
-         args: [TOKEN, query_string, page_size, bookmark]
-     };
-
-     // send the query proposal to the peer
-    let response = await channel.queryByChaincode(request);
-    return response.toString();
-
-}
 
 async function checkToken() {
 
@@ -184,77 +281,7 @@ async function checkToken() {
     let response = await channel.queryByChaincode(request);
     return response.toString();
 }
-
-async function createToken() {
-
-    let peerName = channel.getChannelPeer(PEER_NAME)
-
-    var tx_id = client.newTransactionID();
-    let tx_id_string = tx_id.getTransactionID();
-    
-    var request = {
-        targets: peerName,
-        chaincodeId: CHAINCODE_ID,
-        fcn: 'CreateClientToken',
-        args: [TOKEN],
-        chainId: CHANNEL_NAME,
-        txId: tx_id
-    };
-
-
-    //console.log("#1 Transaction proposal successfully sent to channel.")
-    try{
-        let results = await channel.sendTransactionProposal(request);
-        
-        // Array of proposal responses
-        var proposalResponses = results[0];
-
-        var proposal = results[1];
-
-        var all_good = true;
-        for (var i in proposalResponses) {
-            let good = false
-            if (proposalResponses && proposalResponses[i].response &&
-                proposalResponses[i].response.status === 200) {
-                good = true;
-                //console.log(`\tChaincode invocation proposal response #${i} was good`);
-            } else {
-                //console.log(`\tChaincode invocation proposal response #${i} was bad!`);
-            }
-            all_good = all_good & good
-        }
-        //console.log("#2 Looped through the proposal responses all_good=", all_good)
-
-        await setupTxListener(tx_id_string, 'token')
-        //console.log('#3 Registered the Tx Listener')
-
-        var orderer_request = {
-            txId: tx_id,
-            proposalResponses: proposalResponses,
-            proposal: proposal
-        };
-
-        await channel.sendTransaction(orderer_request);
-        //console.log("#4 Transaction has been submitted.")
-
-    }catch{
-        //console.log('(Error: Failed to complete the transaction lifecycle procedure. '+
-         //               'Please ensure that the provided connection data is valid.')
-        exit(0);
-    }
-    
-}
-
-async function getTag1(tag1, page_size, bookmark){
-    return await queryAdHoc('{"selector":{"tag1":"' + tag1 + '"}, "use_index":["_design/indexTag1", "indexTag1"]}', page_size, bookmark);
-}
-async function getTag2(tag2, page_size, bookmark){
-    return await queryAdHoc('{"selector":{"tag2":"' + tag2 + '"}, "use_index":["_design/indexTag2", "indexTag2"]}', page_size, bookmark);
-}
-async function getTag12(tag1, tag2, page_size, bookmark){
-    return await queryAdHoc('{"selector":{"$and":[{"tag1":"' + tag1 + '"},{"tag2":"' + tag2 + '"}]}, "use_index":["_design/indexTag12", "indexTag12"]}', page_size, bookmark);
-}
-
+*/
 async function setupTxListener(tx_id_string, type) {
 
     try{
@@ -332,31 +359,7 @@ async function setupChannel() {
 
 /////////////////////////////////////////////////REST SERVER/////////////////////////////////////////////////////
 
-
-app.post('/token', async function(req, res, next){
-
-    if (!req.body.hasOwnProperty('token')){
-        res.status(400).send({'message':'Bad Request Error: Query parameter "token" is missing.'});
-        return
-    }
- 
-    TOKEN = req.body.token;
-    
-    // creates a new client token; i.e. authorizes a new client
-    try {
-        submit_token_map.set(TOKEN, {is_completed: 'false', status: 'PENDING'});
-        await createToken();        
-        res.status(200).send({'message':'OK'});
-        return
-    }catch(e){
-        console.log(e);
-        submit_token_map.set(TOKEN, {is_completed: 'false', status: 'ERROR'});
-        res.status(500).send({'message':'Internal Server Error: Failed to create token ' + TOKEN + '.'});
-        return
-    }
-   
-});
-
+/*
 app.put('/submit', async function (req, res, next){
 
     if (!req.body.hasOwnProperty('token')){
@@ -465,192 +468,7 @@ app.get("/latest/model", async function(req, res, next){
     }
 
 });
-
-app.get("/latest/tags", async function(req, res, next){
-
-    if (req.query.hasOwnProperty('token')){    
-        TOKEN = req.query.token;
-
-        if (!req.query.hasOwnProperty('page_size') || !req.query.hasOwnProperty('bookmark')){        
-            res.status(400).send({'message':'Bad Request Error: Ensure  valid "page_size" and "bookmark" query' +
-                                    ' parameters are provided.'});
-                return
-        }
-        PAGE_SIZE = req.query.page_size;
-        BOOKMARK = req.query.bookmark;
-
-        if (!req.query.hasOwnProperty('tag1') || !req.query.hasOwnProperty('tag2')){               
-            res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
-            return
-        }
-        TAG1 = req.query.tag1;
-        TAG2 = req.query.tag2;
-
-        try {          
-            var results = await getTag12(TAG1, TAG2, PAGE_SIZE, BOOKMARK);
-
-            try {
-                results = JSON.parse(results);
-            }catch{
-                if (results.includes('authorization')){
-                    res.status(401).send({'message':'Unauthorized: authorization not granded: token ' + TOKEN
-                                            +' is invalid'});
-                    return
-                }         
-                results = [];
-            }
-            res.status(200).send(results);
-        }catch(e){
-            console.log(e);
-            res.status(500).send({'message':'Internal Server Error: Failed to execute tag query.'});
-            return
-        }
-    }else{
-        res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
-        return
-    }
-
-});
-
-app.get("/latest/tags/tag1", async function(req, res, next){
-
-    if (req.query.hasOwnProperty('token')){    
-        TOKEN = req.query.token;
-
-        if (!req.query.hasOwnProperty('page_size') || !req.query.hasOwnProperty('bookmark')){        
-            res.status(400).send({'message':'Bad Request Error: Ensure  valid "page_size" and "bookmark" query' +
-                                    ' parameters are provided.'});
-                return
-        }
-        PAGE_SIZE = req.query.page_size;
-        BOOKMARK = req.query.bookmark;
-
-        if (!req.query.hasOwnProperty('tag1')){               
-            res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
-            return
-        }
-        TAG1 = req.query.tag1;
-
-        try {          
-            var results = await getTag1(TAG1, PAGE_SIZE, BOOKMARK);
-
-            try {
-                results = JSON.parse(results);
-            }catch{
-                if (results.includes('authorization')){
-                    res.status(401).send({'message':'Unauthorized: authorization not granded: token ' + TOKEN
-                                            +' is invalid'});
-                    return
-                }         
-                results = [];
-            }
-            res.status(200).send(results);
-        }catch(e){
-            console.log(e);
-            res.status(500).send({'message':'Internal Server Error: Failed to execute tag query.'});
-            return
-        }
-    }else{
-        res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
-        return
-    }
-
-});
-
-app.get("/latest/tags/tag2",async function(req, res, next){
-
-    if (req.query.hasOwnProperty('token')){    
-        TOKEN = req.query.token;
-
-        if (!req.query.hasOwnProperty('page_size') || !req.query.hasOwnProperty('bookmark')){        
-            res.status(400).send({'message':'Bad Request Error: Ensure  valid "page_size" and "bookmark" query' +
-                                    ' parameters are provided.'});
-                return
-        }
-        PAGE_SIZE = req.query.page_size;
-        BOOKMARK = req.query.bookmark;
-
-        if (!req.query.hasOwnProperty('tag2')){               
-            res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
-            return
-        }
-        TAG2 = req.query.tag2;
-
-        try {          
-            var results = await getTag2(TAG2, PAGE_SIZE, BOOKMARK);
-
-            try {
-                results = JSON.parse(results);
-            }catch{
-                if (results.includes('authorization')){
-                    res.status(401).send({'message':'Unauthorized: authorization not granded: token ' + TOKEN
-                                            +' is invalid'});
-                    return
-                }         
-                results = [];
-            }
-            res.status(200).send(results);
-        }catch(e){
-            console.log(e);
-            res.status(500).send({'message':'Internal Server Error: Failed to execute tag query.'});
-            return
-        }
-    }else{
-        res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
-        return
-    }
-
-});
-
-app.get("/history", async function(req, res, next){
-
-    if (!req.query.hasOwnProperty('token')){
-        res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
-            return
-    }
-    
-    if (!req.query.hasOwnProperty('id')){        
-        res.status(400).send({'message':'Bad Request Error: Ensure query parameter "id" is provided.'});
-            return
-    }
-
-    TOKEN = req.query.token;
-    MODEL_ID = req.query.id;
-   
-    if (!req.query.hasOwnProperty('min') || !req.query.hasOwnProperty('max')){
-        res.status(400).send({'message':'Bad Request Error: Query arameters "min" and/or "max" is/are missing.'});
-        return
-    }
-    MIN_TIMESTAMP = req.query.min;
-    MAX_TIMESTAMP = req.query.max;
-    if (isNaN(MIN_TIMESTAMP) || isNaN(MAX_TIMESTAMP) || (parseInt(MAX_TIMESTAMP, 10) < parseInt(MIN_TIMESTAMP, 10))
-             || (parseInt(MAX_TIMESTAMP, 10) <= 0) || (parseInt(MIN_TIMESTAMP, 10) <= 0)){
-            res.status(400).send({'message':'Bad Request Error: Invalid assignment to property "min" and/or "max".\n'+
-                                'Must provide a timestamp with an accuracy of seconds.'});
-        return
-    }
-    
-
-    try {          
-        var history = await getHistory(MODEL_ID, MIN_TIMESTAMP, MAX_TIMESTAMP);
-        try{
-            history = JSON.parse(history);
-        }catch{
-            if (history.includes('authorization')){
-                res.status(401).send({'message':'Unauthorized: authorization not granded: token ' + TOKEN
-                                        +' is invalid'});
-                return
-            }
-            history = [];
-        }
-        res.status(200).send(history);
-    }catch(e){
-        console.log(e);
-        res.status(500).send({'message':'Internal Server Error: Failed to retrieve history.'});
-        return
-    }
-        
-});
+*/
 
 
 async function main() {
@@ -659,41 +477,65 @@ async function main() {
     client = await setupClient();
     channel = await setupChannel();
 
-    /*
+    
     TOKEN = 'token';
-
-    MODEL_ID = 'id_2';
-    var Tx = {};
-    Tx.tag1 = 'tag1';
-    Tx.tag2 = 'tag2';
-    Tx.serialization_encoding = 'serialization_encoding';
-    Tx.model = [];
-    Tx.weights = [];
-    Tx.initialization = [];
-    Tx.checkpoints = [];
+    
+    MODEL_ID = 'id_0';
+    
+    /*
+    var TxMeta = {};
+    TxMeta.model_id = MODEL_ID;
+    TxMeta.tag1 = "tag1";
+    TxMeta.tag2 = "tag2";
+    TxMeta.serialization_encoding = "base64";
+    TxMeta.page_number = 2;
+    //console.log(TxMeta);
     LAST = 'false';
-    await submitModel(MODEL_ID, Tx);
+    await submitMeta(MODEL_ID, TxMeta);
+    
+    
+    var TxPage = {};
+    TxPage.model_id = MODEL_ID;
+    TxPage.page_id = 0;
+    TxPage.data = "data0";
+    TxPage.digest = "dummy digest 0";
+    TxPage.page_bytes = 5
+    //console.log(TxPage);
+    LAST = 'false';
+    await submitPage(MODEL_ID, TxPage);
 
-    MODEL_ID = 'id_3';
-    var meta = {};
-    var metadata ={};
-    metadata.identifier = "id";
-    metadata.original_format = "format";
-    meta.metadata = metadata;
-    meta.serialized_data = "string";
-    Tx.model = [meta];
+    TxPage.page_id = 1;
+    TxPage.data = "data1";
+    TxPage.digest = "dummy digest 1";
+    //console.log(TxPage);
+    LAST = 'false';
+    await submitPage(MODEL_ID, TxPage);
+    
+    TxPage.page_id = 2;
+    TxPage.data = "data2";
+    TxPage.digest = "dummy digest 2";
+    //console.log(TxPage);
     LAST = 'true';
-    await submitModel(MODEL_ID, Tx);
+    await submitPage(MODEL_ID, TxPage);
+    
+    return
     */
 
+    //await getLastModel(3,'');
+    //await getMeta();
+    //await getTag1Meta("tag1", 3, '')
+    //await getTag2Meta("tag2", 3, '')
+    //await getTag12Meta("tag1", "tag2", 3, '')
     
+
+    /*
     //start REST server
     var server = app.listen(3000, function () {
         var host = server.address().address
         var port = server.address().port
         console.log("Example app listening at http://%s:%s", host, port)
     });
-    
+    */
 
 }
 
