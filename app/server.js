@@ -21,6 +21,7 @@ const USER_NAME = 'Admin';
 const PEER_NAME = 'peer0.org1.example.com';
 const CHANNEL_NAME = 'mychannel';
 const CHAINCODE_ID = 'contract_models';
+const MAX_CHUNK_SIZE = 50;
 var TOKEN = '';
 var MODEL_ID = '';    
 var TAG1 = '';
@@ -30,6 +31,7 @@ var MAX_TIMESTAMP = '';
 var PAGE_SIZE = '';
 var BOOKMARK = '';
 var LAST = '';
+
 
 // Constants for profile
 const CONNECTION_PROFILE_PATH = './profiles/dev-connect.yaml';
@@ -171,7 +173,7 @@ async function submitPage(tx_data) {
 
 }
 
-async function getLastModel(page_size, bookmark) {
+async function getLastPages(page_size, bookmark) {
 
     if (bookmark === "''" || bookmark === '""'){
         bookmark = '';
@@ -188,8 +190,8 @@ async function getLastModel(page_size, bookmark) {
 
      // send the query proposal to the peer
     let response = await channel.queryByChaincode(request);
-    console.log(response.toString());
-    //return response.toString();
+    
+    return response.toString();
 
 }
 
@@ -206,8 +208,8 @@ async function getMeta() {
 
     // send the query proposal to the peer
     var response = await channel.queryByChaincode(request);
-    console.log(response.toString());
-    //return response.toString();
+    
+    return response.toString();
      
 }
 
@@ -233,19 +235,13 @@ async function queryAdHocMeta(query_string, page_size, bookmark) {
 }
 
 async function getTag1Meta(tag1, page_size, bookmark){
-    let res = await queryAdHocMeta('{"selector":{"tag1":"' + tag1 + '"}, "use_index":["_design/indexTag1", "indexTag1"]}', page_size, bookmark);
-    console.log(res);
-    //return res
+    return await queryAdHocMeta('{"selector":{"tag1":"' + tag1 + '"}, "use_index":["_design/indexTag1", "indexTag1"]}', page_size, bookmark);
 }
 async function getTag2Meta(tag2, page_size, bookmark){
-    let res = await queryAdHocMeta('{"selector":{"tag2":"' + tag2 + '"}, "use_index":["_design/indexTag2", "indexTag2"]}', page_size, bookmark);
-    console.log(res);
-    //return res
+    return await queryAdHocMeta('{"selector":{"tag2":"' + tag2 + '"}, "use_index":["_design/indexTag2", "indexTag2"]}', page_size, bookmark);
 }
 async function getTag12Meta(tag1, tag2, page_size, bookmark){
-    let res = await queryAdHocMeta('{"selector":{"$and":[{"tag1":"' + tag1 + '"},{"tag2":"' + tag2 + '"}]}, "use_index":["_design/indexTag12", "indexTag12"]}', page_size, bookmark);
-    console.log(res);
-    //return res
+    return await queryAdHocMeta('{"selector":{"$and":[{"tag1":"' + tag1 + '"},{"tag2":"' + tag2 + '"}]}, "use_index":["_design/indexTag12", "indexTag12"]}', page_size, bookmark);
 }
 
 /*
@@ -315,14 +311,10 @@ async function setupTxListener(tx_id_string, type) {
                 console.log(MODEL_ID, submit_tx_map_meta.get(MODEL_ID))
             }
             
-             
-            
-            
             //for (const [key, value] of submit_tx_map_meta.entries()) {
             //  console.log(key, value);
             //}
             
-                        
         },
             // 3. Callback for errors
             (err) => {
@@ -414,8 +406,7 @@ app.put('/submit', async function (req, res, next){
 
     var all_pages = JSON.stringify(compressJSON.compress(Tx_Pages));
     var buf = Buffer.from(all_pages, 'utf8')
-    let max_chunk_size = 50;
-    var chunks = chunker(buf, max_chunk_size);
+    var chunks = chunker(buf, MAX_CHUNK_SIZE);
     var pages = [];
     for (let i = 0; i < chunks.length; i++){
         let Tx_Page = {
@@ -457,8 +448,8 @@ app.get('/check', async function(req, res, next){
         try {
             let response = await checkToken();
             if (response.includes('false')){
-                res.status(401).send({'message':'Unauthorized: authorization not granded: token ' + TOKEN
-                                        +' is invalid'});
+                res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + TOKEN
+                                        +'" is invalid'});
                 return
             }
             if (!req.query.hasOwnProperty('id')){
@@ -483,7 +474,7 @@ app.get('/check', async function(req, res, next){
     }
 
 });
-/*
+
 app.get("/latest/model", async function(req, res, next){
 
     if (req.query.hasOwnProperty('token')){    
@@ -492,7 +483,72 @@ app.get("/latest/model", async function(req, res, next){
         try {
             if (req.query.hasOwnProperty('id')){
                 MODEL_ID = req.query.id;
-                let response = await getLatest(MODEL_ID);
+
+                let model = {};
+                let page_counter = 0;
+                BOOKMARK = '';
+                PAGE_SIZE = 1;
+                
+                while(true){ //get all the data pages
+                    try{
+                        let response = await getLastPages(PAGE_SIZE, BOOKMARK);
+                        if (page_counter == 0 && response.includes('authorization')){
+                            res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + TOKEN
+                                                    +'" is invalid'});
+                            return
+                        }
+                        let page = JSON.parse(response);
+                        model[page.records[0].Key] = page.records[0].Value;
+                        BOOKMARK = page.bookmark;
+                        page_counter++;
+                    }catch{
+                        break;
+                    }
+                }
+                var data = "";
+                for (let i = 0; i < page_counter; i++){
+                    data += model[i].data;
+                }
+                let recovered = compressJSON.decompress(JSON.parse(data));
+
+                let response = await getMeta();
+                let meta = JSON.parse(response);
+
+                let ledger_entry = {
+                    tag1: meta.tag1,
+                    tag2: meta.tag2,
+                    serialization_encoding: meta.serialization_encoding,
+                    model: recovered.model,
+                    weights: recovered.weights,
+                    initialization: recovered.initialization,
+                    checkpoints: recovered.checkpoints
+                }
+
+                res.status(200).send(ledger_entry);
+            }else{
+                res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
+            }
+        }catch(e){
+            console.log(e);
+            res.status(404).send({'message':'Not Found: Model with id "' + MODEL_ID + '" does not exist.'});
+            return
+        }
+
+    }else{
+        res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
+        return
+    }
+
+});
+
+app.get("/latest/metadata", async function(req, res, next){
+    if (req.query.hasOwnProperty('token')){    
+        TOKEN = req.query.token;
+
+        try {
+            if (req.query.hasOwnProperty('id')){
+                MODEL_ID = req.query.id;
+                let response = await getMeta();
                 if (response.includes('authorization')){
                     res.status(401).send({'message':'Unauthorized: authorization not granded: token ' + TOKEN
                                             +' is invalid'});
@@ -512,9 +568,141 @@ app.get("/latest/model", async function(req, res, next){
         res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
         return
     }
+});
+
+app.get("/latest/tags", async function(req, res, next){
+
+    if (req.query.hasOwnProperty('token')){    
+        TOKEN = req.query.token;
+
+        if (!req.query.hasOwnProperty('page_size') || !req.query.hasOwnProperty('bookmark')){        
+            res.status(400).send({'message':'Bad Request Error: Ensure  valid "page_size" and "bookmark" query' +
+                                    ' parameters are provided.'});
+                return
+        }
+        PAGE_SIZE = req.query.page_size;
+        BOOKMARK = req.query.bookmark;
+
+        if (!req.query.hasOwnProperty('tag1') || !req.query.hasOwnProperty('tag2')){               
+            res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
+            return
+        }
+        TAG1 = req.query.tag1;
+        TAG2 = req.query.tag2;
+
+        try {          
+            var results = await getTag12Meta(TAG1, TAG2, PAGE_SIZE, BOOKMARK);
+            try {
+                results = JSON.parse(results);
+            }catch(e){
+                if (results.includes('authorization')){
+                    res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + TOKEN
+                                            +'" is invalid'});
+                    return
+                }         
+                results = {records: [], fetchedRecordsCount: 0, bookmark: ""};
+            }
+            res.status(200).send(results);
+        }catch(e){
+            res.status(500).send({'message':'Internal Server Error: Failed to execute tag query.'});
+            return
+        }
+    }else{
+        res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
+        return
+    }
 
 });
-*/
+
+app.get("/latest/tags/tag1", async function(req, res, next){
+
+    if (req.query.hasOwnProperty('token')){    
+        TOKEN = req.query.token;
+
+        if (!req.query.hasOwnProperty('page_size') || !req.query.hasOwnProperty('bookmark')){        
+            res.status(400).send({'message':'Bad Request Error: Ensure  valid "page_size" and "bookmark" query' +
+                                    ' parameters are provided.'});
+                return
+        }
+        PAGE_SIZE = req.query.page_size;
+        BOOKMARK = req.query.bookmark;
+
+        if (!req.query.hasOwnProperty('tag1')){               
+            res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
+            return
+        }
+        TAG1 = req.query.tag1;
+
+        try {          
+            var results = await getTag1Meta(TAG1, PAGE_SIZE, BOOKMARK);
+
+            try {
+                results = JSON.parse(results);
+            }catch{
+                if (results.includes('authorization')){
+                    res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + TOKEN
+                                            +'" is invalid'});
+                    return
+                }         
+                results = {records: [], fetchedRecordsCount: 0, bookmark: ""};
+            }
+            res.status(200).send(results);
+        }catch(e){
+            console.log(e);
+            res.status(500).send({'message':'Internal Server Error: Failed to execute tag query.'});
+            return
+        }
+    }else{
+        res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
+        return
+    }
+
+});
+
+app.get("/latest/tags/tag2",async function(req, res, next){
+
+    if (req.query.hasOwnProperty('token')){    
+        TOKEN = req.query.token;
+
+        if (!req.query.hasOwnProperty('page_size') || !req.query.hasOwnProperty('bookmark')){        
+            res.status(400).send({'message':'Bad Request Error: Ensure  valid "page_size" and "bookmark" query' +
+                                    ' parameters are provided.'});
+                return
+        }
+        PAGE_SIZE = req.query.page_size;
+        BOOKMARK = req.query.bookmark;
+
+        if (!req.query.hasOwnProperty('tag2')){               
+            res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
+            return
+        }
+        TAG2 = req.query.tag2;
+
+        try {          
+            var results = await getTag2Meta(TAG2, PAGE_SIZE, BOOKMARK);
+
+            try {
+                results = JSON.parse(results);
+            }catch{
+                if (results.includes('authorization')){
+                    res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + TOKEN
+                                            +'" is invalid'});
+                    return
+                }         
+                results = {records: [], fetchedRecordsCount: 0, bookmark: ""};
+            }
+            res.status(200).send(results);
+        }catch(e){
+            console.log(e);
+            res.status(500).send({'message':'Internal Server Error: Failed to execute tag query.'});
+            return
+        }
+    }else{
+        res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
+        return
+    }
+
+});
 
 
 async function main() {
@@ -531,7 +719,7 @@ async function main() {
         console.log("Example app listening at http://%s:%s", host, port)
     });
     
-       
+    
     return
 
     TOKEN = 'token';
@@ -551,7 +739,7 @@ async function main() {
     TxPage.digest = "dummy digest 0";
     TxPage.page_bytes = 5
     
-    
+    /*
     var all_pages = JSON.stringify(compressJSON.compress(TxPage));
     var buf = Buffer.from(all_pages, 'utf8')
     let max_chunk_size = 50;
@@ -577,22 +765,47 @@ async function main() {
         }
         await submitPage(pages[i]);
     }
+    
+
+    var model = {};
+    let page_counter = 0;
+    BOOKMARK = '';
+    PAGE_SIZE = 1;
+    
+    while(true){ //get all pages
+        try{
+            let page = JSON.parse(await getLastPages(PAGE_SIZE, BOOKMARK));
+            model[page.records[0].Key] = page.records[0].Value;
+            BOOKMARK = page.bookmark;
+            page_counter++;
+        }catch{
+            break;
+        }
+    }
     var data = "";
-    for (let i = 0; i < pages.length; i++){
-        data += pages[i].data
+    for (let i = 0; i < page_counter; i++){
+        data += model[i].data;
     }
     let recovered = compressJSON.decompress(JSON.parse(data));
-
-    //await submitPage(MODEL_ID, TxPage);
     
-    //await getLastModel(3,'');
+    let response = await getMeta();
+    let meta = JSON.parse(response);
+
+    let ledger_entry = {
+        tag1: meta.tag1,
+        tag2: meta.tag2,
+        serialization_encoding: meta.serialization_encoding,
+        model: recovered.model,
+        weights: recovered.weights,
+        initialization: recovered.initialization,
+        checkpoints: recovered.checkpoints
+    }
+    console.log(ledger_entry);
+    */
     //await getMeta();
     //await getTag1Meta("tag1", 3, '')
     //await getTag2Meta("tag2", 3, '')
     //await getTag12Meta("tag1", "tag2", 3, '')
-    
-
-    
 
 }
 

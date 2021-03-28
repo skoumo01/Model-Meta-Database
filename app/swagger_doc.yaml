@@ -17,8 +17,6 @@ tags:
   description: "Check submission transaction status"
 - name: "latest"
   description: "Query latest version"
-- name: "history"
-  description: "Retrieve history"
 schemes:
 - "http"
 paths:
@@ -135,11 +133,52 @@ paths:
           description: "Internal Server Error."
           schema:
             $ref: "#/definitions/InternalServerResponse"
+  /latest/metadata:
+    get:
+      tags:
+      - "latest"
+      summary: "Query the metadata of a specific model"
+      description: ""
+      operationId: "latestModelMetadata"
+      produces:
+      - "application/json"
+      parameters:
+      - name: "token"
+        in: "query"
+        description: "The client's blockchain authentication/authorization token."
+        required: true
+        type: "string"
+      - name: "id"
+        in: "query"
+        description: "The model's ID. e.g. 'id_0'"
+        required: true
+        type: "string"
+      responses:
+        "200":
+          description: "Successfully retrieved metadata from blockchain."
+          schema:
+            $ref: "#/definitions/Metadata"
+        "400":
+          description: "Bad Request; one or more of the required properties have not been provided."
+          schema:
+            $ref: "#/definitions/BadRequestResponse"
+        "401":
+          description: "Unauthorized action. The provided client token was checked and deemed invalid."
+          schema:
+            $ref: "#/definitions/AuthorizationErrorResponse"
+        "404":
+          description: "Model not found. This means that there was no previous attempt to submit a model with this specific ID."
+          schema:
+            $ref: "#/definitions/NotFoundResponse"
+        "500":
+          description: "Internal Server Error."
+          schema:
+            $ref: "#/definitions/InternalServerResponse"
   /latest/tags:
     get:
       tags:
       - "latest"
-      summary: "Query the latest version of the models by 2 tags"
+      summary: "Query the metadata of the models with these 2 tags"
       description: ""
       operationId: "tagsQuery"
       produces:
@@ -152,15 +191,14 @@ paths:
         type: "string"
       - name: "page_size"
         in: "query"
-        description: "The max number of models to retrieve"
+        description: "The max number of metadata entries to retrieve"
         required: true
         type: "string"
       - name: "bookmark"
         in: "query"
-        description: "The query bookmark to use. The provided bookmark determines which query-result page to retrieve. e.g. To retrieve all the data in a result set of 10 models using page_size=3 the user needs to initially provide an empty bookmark, and (in subsequent calls) the bookmark string returned by the previous call to this endpoint; a total of 4 calls for this example."
+        description: "The query bookmark to use. The provided bookmark determines which query-result page to retrieve. e.g. To retrieve all the data in a result set of 10 metadata entries using page_size=3 the user needs to initially provide an empty bookmark ('' or \"\"), and (in subsequent calls) the bookmark string returned by the previous call to this endpoint; a total of 4 calls for this example."
         required: true
         type: "string"
-        example: "''"
       - name: "tag1"
         in: "query"
         description: "The desired value for the tag1 query field"
@@ -192,7 +230,7 @@ paths:
     get:
       tags:
       - "latest"
-      summary: "Query the latest version of the models by tag1"
+      summary: "Query the metadata of the models with a specific tag1"
       description: ""
       operationId: "tag1Query"
       produces:
@@ -205,15 +243,14 @@ paths:
         type: "string"
       - name: "page_size"
         in: "query"
-        description: "The max number of models to retrieve"
+        description: "The max number of metadata entries to retrieve"
         required: true
         type: "string"
       - name: "bookmark"
         in: "query"
-        description: "The query bookmark to use. The provided bookmark determines which query-result page to retrieve. e.g. To retrieve all the data in a result set of 10 models using page_size=3 the user needs to initially provide an empty bookmark, and (in subsequent calls) the bookmark string returned by the previous call to this endpoint; a total of 4 calls for this example."
+        description: "The query bookmark to use. The provided bookmark determines which query-result page to retrieve. e.g. To retrieve all the data in a result set of 10 10 metadata entries using page_size=3 the user needs to initially provide an empty bookmark ('' or \"\"), and (in subsequent calls) the bookmark string returned by the previous call to this endpoint; a total of 4 calls for this example."
         required: true
         type: "string"
-        example: "''"
       - name: "tag1"
         in: "query"
         description: "The desired value for the tag1 query field"
@@ -240,7 +277,7 @@ paths:
     get:
       tags:
       - "latest"
-      summary: "Query the latest version of the models by tag2"
+      summary: "Query the metadata of the models with a specific tag2"
       description: ""
       operationId: "tag2Query"
       produces:
@@ -253,15 +290,14 @@ paths:
         type: "string"
       - name: "page_size"
         in: "query"
-        description: "The max number of models to retrieve"
+        description: "The max number of metadata entries to retrieve"
         required: true
         type: "string"
       - name: "bookmark"
         in: "query"
-        description: "The query bookmark to use. The provided bookmark determines which query-result page to retrieve. e.g. To retrieve all the data in a result set of 10 models using page_size=3 the user needs to initially provide an empty bookmark, and (in subsequent calls) the bookmark string returned by the previous call to this endpoint; a total of 4 calls for this example."
+        description: "The query bookmark to use. The provided bookmark determines which query-result page to retrieve. e.g. To retrieve all the data in a result set of 10 10 metadata entries using page_size=3 the user needs to initially provide an empty bookmark ('' or \"\"), and (in subsequent calls) the bookmark string returned by the previous call to this endpoint; a total of 4 calls for this example."
         required: true
         type: "string"
-        example: "''"
       - name: "tag2"
         in: "query"
         description: "The desired value for the tag2 query field"
@@ -272,53 +308,6 @@ paths:
           description: "The tag query has been successfully carried out."
           schema:
             $ref: "#/definitions/QueryResults"
-        "400":
-          description: "Bad Request; one or more of the required properties have not been provided."
-          schema:
-            $ref: "#/definitions/BadRequestResponse"
-        "401":
-          description: "Unauthorized action. The provided client token was checked and deemed invalid."
-          schema:
-            $ref: "#/definitions/AuthorizationErrorResponse"
-        "500":
-          description: "Internal Server Error: Failed to execute tag query."
-          schema:
-            $ref: "#/definitions/InternalServerResponse"
-  /history:
-    get:
-      tags:
-      - "history"
-      summary: "Query the version history of a model"
-      description: "Retrieves the successfully commited (on the blockchain) versions of a model within the specified (in seconds) time-bounds."
-      operationId: "getHistory"
-      produces:
-      - "application/json"
-      parameters:
-      - name: "token"
-        in: "query"
-        description: "The client's blockchain authentication/authorization token."
-        required: true
-        type: "string"
-      - name: "id"
-        in: "query"
-        description: "The model's ID (e.g. id_0)."
-        required: true
-        type: "string"
-      - name: "min"
-        in: "query"
-        description: "The low bound for the history query in seconds."
-        required: true
-        type: "string"
-      - name: "max"
-        in: "query"
-        description: "The upper bound for the history query in seconds."
-        required: true
-        type: "string"
-      responses:
-        "200":
-          description: "The history query has been successfully carried out. If there is no model with the specified id, the returned result array is empty."
-          schema:
-            $ref: "#/definitions/HistoryQueryResults"
         "400":
           description: "Bad Request; one or more of the required properties have not been provided."
           schema:
@@ -418,24 +407,13 @@ definitions:
               example: "id_0"
             Value:
               type: "object"
-              $ref: "#/definitions/Data"
+              $ref: "#/definitions/Metadata"
       fetchedRecordsCount:
         type: "integer"
         example: 3
       bookmark:
         type: "string"
         example: ""
-  HistoryQueryResults:
-    type: "array"
-    items:
-      type: "object"
-      properties:
-        record:
-          type: "object"
-          $ref: "#/definitions/Data"
-        timestamp:
-          type: "string"
-          example: "2021-03-03T07:18:45.19Z"
   GenericFile:
     type: "object"
     properties:
@@ -512,3 +490,22 @@ definitions:
         items:
           $ref: "#/definitions/GenericFile"
         example: []
+  Metadata:
+    type: "object"
+    properties:
+      model_id:
+        type: "string"
+        example: "id_0"
+      tag1:
+        type: "string"
+        example: "tag1"
+      tag2:
+        type: "string"
+        example: "tag2"
+      serialization_encoding:
+        type: "string"
+        example: "base64"
+      page_number:
+        type: "integer"
+        example: 5
+        description: "The number of pages into which the model is split on the blockchain. The number of pages equals the number of valid blockchain ledger entries that exist for the corresponding data."
