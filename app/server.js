@@ -1,10 +1,11 @@
 'use strict';
 const express = require('express');
-const execFile = require('child_process').execFile;
 const HashMap = require('hashmap');
+const compressJSON = require('compress-json');
+const chunker = require('buffer-chunks');
+const MD5 = require('crypto-js/md5');
 var app = express();
-var submit_tx_map = new HashMap();
-var submit_token_map = new HashMap();
+var submit_tx_map_meta = new HashMap();
 var cors = require('cors');
 
 app.use(cors());
@@ -50,7 +51,7 @@ var client = {}
 // Variable to hold the channel
 var channel = {}
 
-async function submitMeta(model_id, tx_data) {
+async function submitMeta(tx_data) {
 
     let peerName = channel.getChannelPeer(PEER_NAME)
 
@@ -61,7 +62,7 @@ async function submitMeta(model_id, tx_data) {
         targets: peerName,
         chaincodeId: CHAINCODE_ID,
         fcn: 'SubmitMeta',
-        args: [TOKEN, model_id, JSON.stringify(tx_data)],
+        args: [TOKEN, MODEL_ID, JSON.stringify(tx_data)],
         chainId: CHANNEL_NAME,
         txId: tx_id
     };
@@ -90,7 +91,7 @@ async function submitMeta(model_id, tx_data) {
         }
         console.log("#2 Looped through the proposal responses all_good=", all_good)
 
-        await setupTxListener(tx_id_string, 'model')//commented out for debugging
+        await setupTxListener(tx_id_string, 'meta')//commented out for debugging
         console.log('#3 Registered the Tx Listener')
 
         var orderer_request = {
@@ -103,14 +104,14 @@ async function submitMeta(model_id, tx_data) {
         console.log("#4 Transaction has been submitted.")
 
     }catch{
-        submit_tx_map.set(MODEL_ID, {is_completed: 'true', status: 'UNAUTHORIZED'});
+        submit_tx_map_meta.set(MODEL_ID, {is_completed: 'true', status: 'UNAUTHORIZED', pending: -1});
         return
     }
     
 
 }
 
-async function submitPage(model_id, tx_data) {
+async function submitPage(tx_data) {
 
     let peerName = channel.getChannelPeer(PEER_NAME)
 
@@ -121,7 +122,7 @@ async function submitPage(model_id, tx_data) {
         targets: peerName,
         chaincodeId: CHAINCODE_ID,
         fcn: 'SubmitPage',
-        args: [TOKEN, model_id, JSON.stringify(tx_data)],
+        args: [TOKEN, MODEL_ID, JSON.stringify(tx_data)],
         chainId: CHANNEL_NAME,
         txId: tx_id
     };
@@ -150,7 +151,7 @@ async function submitPage(model_id, tx_data) {
         }
         console.log("#2 Looped through the proposal responses all_good=", all_good)
 
-        await setupTxListener(tx_id_string, 'model')//commented out for debugging
+        await setupTxListener(tx_id_string, 'page')//commented out for debugging
         console.log('#3 Registered the Tx Listener')
 
         var orderer_request = {
@@ -163,7 +164,7 @@ async function submitPage(model_id, tx_data) {
         console.log("#4 Transaction has been submitted.")
 
     }catch{
-        submit_tx_map.set(MODEL_ID, {is_completed: 'true', status: 'UNAUTHORIZED'});
+        submit_tx_map_meta.set(MODEL_ID, {is_completed: 'true', status: 'UNAUTHORIZED', pending: -1});
         return
     }
     
@@ -265,7 +266,7 @@ async function getLatest(model_id) {
      
 }
 
-
+*/
 async function checkToken() {
 
     let peerName = channel.getChannelPeer(PEER_NAME)
@@ -281,7 +282,7 @@ async function checkToken() {
     let response = await channel.queryByChaincode(request);
     return response.toString();
 }
-*/
+
 async function setupTxListener(tx_id_string, type) {
 
     try{
@@ -294,20 +295,34 @@ async function setupTxListener(tx_id_string, type) {
             console.log('Transaction %s is in block %s', tx, block_num);
             
             if (code !== 'VALID') {
-                if (type === 'token'){
-                    submit_token_map.set(TOKEN, {is_completed: 'true', status: 'INVALID'});
-                }else{
-                    submit_tx_map.set(MODEL_ID, {is_completed: 'true', status: 'INVALID'});
-                }           
+                submit_tx_map_meta.set(MODEL_ID, {is_completed: 'true', status: 'CORRUPTED', pending: -1});
             }
 
-            if (type === 'token'){
-                submit_token_map.set(TOKEN, {is_completed: 'true', status: 'VALID'});
-            }else{
-                submit_tx_map.set(MODEL_ID, {is_completed: 'true', status: 'VALID'});
-            } 
             
-           //console.log(JSON.stringify(response));
+            let status = submit_tx_map_meta.get(MODEL_ID);
+            if (status.status === 'PENDING'){
+                let pending = status.pending - 1;
+                if (pending === 0){
+                    submit_tx_map_meta.set(MODEL_ID, {is_completed: 'true', status: 'VALID', pending: pending});
+                }else{
+                    submit_tx_map_meta.set(MODEL_ID, {is_completed: 'false', status: 'PENDING', pending: pending});
+                }
+            }
+
+            if (type === 'meta'){
+                console.log(MODEL_ID+'_metadata', submit_tx_map_meta.get(MODEL_ID))
+            }else{
+                console.log(MODEL_ID, submit_tx_map_meta.get(MODEL_ID))
+            }
+            
+             
+            
+            
+            //for (const [key, value] of submit_tx_map_meta.entries()) {
+            //  console.log(key, value);
+            //}
+            
+                        
         },
             // 3. Callback for errors
             (err) => {
@@ -359,7 +374,7 @@ async function setupChannel() {
 
 /////////////////////////////////////////////////REST SERVER/////////////////////////////////////////////////////
 
-/*
+
 app.put('/submit', async function (req, res, next){
 
     if (!req.body.hasOwnProperty('token')){
@@ -382,22 +397,52 @@ app.put('/submit', async function (req, res, next){
     }
     MODEL_ID = req.body.data.id;
 
-    var Tx = {};
-    Tx.tag1 = req.body.data.tag1;
-    Tx.tag2 = req.body.data.tag2;
-    Tx.serialization_encoding = req.body.data.serialization_encoding;
-    Tx.model = req.body.data.model;
-    Tx.weights = req.body.data.weights;
-    Tx.initialization = req.body.data.initialization;
-    Tx.checkpoints = req.body.data.checkpoints;
+    // create metadata page|entry
+    var Tx_Meta = {};
+    Tx_Meta.model_id = MODEL_ID;
+    Tx_Meta.tag1 = req.body.data.tag1;
+    Tx_Meta.tag2 = req.body.data.tag2;
+    Tx_Meta.serialization_encoding = req.body.data.serialization_encoding;
     
+
+    // create data pages
+    var Tx_Pages = {};
+    Tx_Pages.model = req.body.data.model;
+    Tx_Pages.weights = req.body.data.weights;
+    Tx_Pages.initialization = req.body.data.initialization;
+    Tx_Pages.checkpoints = req.body.data.checkpoints;
+
+    var all_pages = JSON.stringify(compressJSON.compress(Tx_Pages));
+    var buf = Buffer.from(all_pages, 'utf8')
+    let max_chunk_size = 50;
+    var chunks = chunker(buf, max_chunk_size);
+    var pages = [];
+    for (let i = 0; i < chunks.length; i++){
+        let Tx_Page = {
+            model_id: MODEL_ID,
+            page_id: i,
+            page_bytes: chunks[i].length,
+            data: chunks[i].toString(),
+            digest: MD5(chunks[i]).toString()
+        }   
+        pages.push(Tx_Page);
+    }
+    Tx_Meta.page_number = pages.length;
+   
     try {
-        submit_tx_map.set(MODEL_ID, {is_completed: 'false', status: 'PENDING'});
-        await submitModel(MODEL_ID, Tx);
+        LAST = 'false';
+        submit_tx_map_meta.set(MODEL_ID, {is_completed: 'false', status: 'PENDING', pending: pages.length+1});
+        await submitMeta(Tx_Meta);
+        for (let i = 0; i < pages.length; i++){
+            if (i == pages.length-1){
+                LAST = 'true';
+            }
+            await submitPage(pages[i]);
+        }
         res.status(200).send({'message':'OK'});
     }catch(e){
         console.log(e);
-        submit_tx_map.set(MODEL_ID, {is_completed: 'false', status: 'ERROR'});
+        submit_tx_map_meta.set(MODEL_ID, {is_completed: 'false', status: 'ERROR', pending: -1});
         res.status(500).send({'message':'Internal Server Error: Failed to submit model ' + MODEL_ID + '.'});
         return
     }
@@ -420,14 +465,15 @@ app.get('/check', async function(req, res, next){
                 res.status(400).send({'message':'Bad Request Error: Ensure query parameter "id" is provided.'});
                     return
             }
+
             MODEL_ID = req.query.id;
-            if (!submit_tx_map.has(MODEL_ID)){
+            if (!submit_tx_map_meta.has(MODEL_ID)){
                 res.status(404).send({'message':'Not Found: Model with id "' + MODEL_ID + '" does not exist.'});
                 return
             }
-            res.status(200).send(submit_tx_map.get(MODEL_ID));
+            res.status(200).send(submit_tx_map_meta.get(MODEL_ID));
         }catch(e){
-            res.status(500).send({'message':'Internal Server Error: Failed to validate token ' + TOKEN + '.'});
+            res.status(500).send({'message':'Internal Server Error: Failed to validate token "' + TOKEN + '".'});
             return
         }
 
@@ -437,7 +483,7 @@ app.get('/check', async function(req, res, next){
     }
 
 });
-
+/*
 app.get("/latest/model", async function(req, res, next){
 
     if (req.query.hasOwnProperty('token')){    
@@ -478,20 +524,24 @@ async function main() {
     channel = await setupChannel();
 
     
+    //start REST server
+    var server = app.listen(3000, function () {
+        var host = server.address().address
+        var port = server.address().port
+        console.log("Example app listening at http://%s:%s", host, port)
+    });
+    
+       
+    return
+
     TOKEN = 'token';
-    
     MODEL_ID = 'id_0';
-    
-    /*
+        
     var TxMeta = {};
     TxMeta.model_id = MODEL_ID;
     TxMeta.tag1 = "tag1";
     TxMeta.tag2 = "tag2";
     TxMeta.serialization_encoding = "base64";
-    TxMeta.page_number = 2;
-    //console.log(TxMeta);
-    LAST = 'false';
-    await submitMeta(MODEL_ID, TxMeta);
     
     
     var TxPage = {};
@@ -500,27 +550,41 @@ async function main() {
     TxPage.data = "data0";
     TxPage.digest = "dummy digest 0";
     TxPage.page_bytes = 5
-    //console.log(TxPage);
-    LAST = 'false';
-    await submitPage(MODEL_ID, TxPage);
-
-    TxPage.page_id = 1;
-    TxPage.data = "data1";
-    TxPage.digest = "dummy digest 1";
-    //console.log(TxPage);
-    LAST = 'false';
-    await submitPage(MODEL_ID, TxPage);
     
-    TxPage.page_id = 2;
-    TxPage.data = "data2";
-    TxPage.digest = "dummy digest 2";
-    //console.log(TxPage);
-    LAST = 'true';
-    await submitPage(MODEL_ID, TxPage);
     
-    return
-    */
+    var all_pages = JSON.stringify(compressJSON.compress(TxPage));
+    var buf = Buffer.from(all_pages, 'utf8')
+    let max_chunk_size = 50;
+    var chunks = chunker(buf, max_chunk_size);
+    var pages = [];
+    for (let i = 0; i < chunks.length; i++){
+        let Tx_Page = {
+            model_id: MODEL_ID,
+            page_id: i,
+            page_bytes: chunks[i].length,
+            data: chunks[i].toString(),
+            digest: MD5(chunks[i]).toString()
+        }   
+        pages.push(Tx_Page);
+    }
+    TxMeta.page_number = pages.length;
+    submit_tx_map_meta.set(MODEL_ID, {is_completed: 'false', status: 'PENDING', pending: pages.length+1});
+    await submitMeta(TxMeta);
+    LAST = 'false';
+    for (let i = 0; i < pages.length; i++){
+        if (i == pages.length-1){
+            LAST = 'true';
+        }
+        await submitPage(pages[i]);
+    }
+    var data = "";
+    for (let i = 0; i < pages.length; i++){
+        data += pages[i].data
+    }
+    let recovered = compressJSON.decompress(JSON.parse(data));
 
+    //await submitPage(MODEL_ID, TxPage);
+    
     //await getLastModel(3,'');
     //await getMeta();
     //await getTag1Meta("tag1", 3, '')
@@ -528,14 +592,7 @@ async function main() {
     //await getTag12Meta("tag1", "tag2", 3, '')
     
 
-    /*
-    //start REST server
-    var server = app.listen(3000, function () {
-        var host = server.address().address
-        var port = server.address().port
-        console.log("Example app listening at http://%s:%s", host, port)
-    });
-    */
+    
 
 }
 
