@@ -232,7 +232,7 @@ func constructMetaQueryResponseFromIterator(resultsIterator shim.StateQueryItera
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Returns the ledger entries which correspond to a specific component of a specific model
+// Returns the ledger entries which correspond to a specific model
 func (t *SimpleChaincode) QueryLatestModelWithPagination(ctx contractapi.TransactionContextInterface, token, modelID string, pageSize int, bookmark string) (*PaginatedQueryResult, error) {
 
 	tokenBytes, err := ctx.GetStub().GetState(token)
@@ -312,6 +312,61 @@ func constructQueryResponseFromIterator(resultsIterator shim.StateQueryIteratorI
 	}
 
 	return pages, nil
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+// DeleteModel deletes the metadata and all the pages of a specific model from the world state: PENDING
+func (t *SimpleChaincode) DeleteModel(ctx contractapi.TransactionContextInterface, token, modelID string, pageSize int, bookmark string) error {
+
+	tokenBytes, err := ctx.GetStub().GetState(token)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve token %s from world state. %v", token, err)
+	}
+
+	if tokenBytes == nil {
+		return fmt.Errorf("authorization not granded: token %s is invalid", token)
+	}
+
+	//retrieve the model's metadata
+	metaBytes, err := ctx.GetStub().GetState(modelID + "_metadata")
+	if err != nil {
+		return fmt.Errorf("failed to get metadata for model %s: %v", modelID, err)
+	}
+	if metaBytes == nil {
+		return fmt.Errorf("model_id %s does not exist", modelID)
+	}
+
+	queryString := fmt.Sprintf(`{"selector":{"model_id":"%s"}}`, modelID)
+	book := bookmark
+	for true {
+		resultsIterator, responseMetadata, err := ctx.GetStub().GetQueryResultWithPagination(queryString, int32(pageSize), book)
+		if err != nil {
+			return err
+		}
+		defer resultsIterator.Close()
+
+		for resultsIterator.HasNext() { //delete ledger entries using the retrieved keys
+			queryResult, err := resultsIterator.Next()
+			if err != nil {
+				return err
+			}
+
+			err = ctx.GetStub().DelState(queryResult.Key)
+			if err != nil {
+				return fmt.Errorf("failed to delete metadata of model %s: %v", queryResult.Key, err)
+			}
+		}
+
+		if responseMetadata.FetchedRecordsCount == 0 {
+			break
+		}
+
+		book = responseMetadata.Bookmark
+
+	}
+
+	return nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////

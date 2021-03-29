@@ -6,6 +6,7 @@ const chunker = require('buffer-chunks');
 const MD5 = require('crypto-js/md5');
 var app = express();
 var submit_tx_map_meta = new HashMap();
+var submit_tx_map_delete = new HashMap();
 var cors = require('cors');
 
 app.use(cors());
@@ -21,7 +22,7 @@ const USER_NAME = 'Admin';
 const PEER_NAME = 'peer0.org1.example.com';
 const CHANNEL_NAME = 'mychannel';
 const CHAINCODE_ID = 'contract_models';
-const MAX_CHUNK_SIZE = 50;
+const MAX_CHUNK_SIZE = 16777216;//10MB
 var TOKEN = '';
 var MODEL_ID = '';    
 var TAG1 = '';
@@ -244,25 +245,68 @@ async function getTag12Meta(tag1, tag2, page_size, bookmark){
     return await queryAdHocMeta('{"selector":{"$and":[{"tag1":"' + tag1 + '"},{"tag2":"' + tag2 + '"}]}, "use_index":["_design/indexTag12", "indexTag12"]}', page_size, bookmark);
 }
 
-/*
-async function getLatest(model_id) {
+async function deleteModel(page_size, bookmark) {
 
     let peerName = channel.getChannelPeer(PEER_NAME)
 
-    let request = {
-         targets: peerName,
-         chaincodeId: CHAINCODE_ID,
-         fcn: 'GetLatestVersion',
-         args: [TOKEN, model_id]
-     };
+    var tx_id = client.newTransactionID();
+    let tx_id_string = tx_id.getTransactionID();
 
-    // send the query proposal to the peer
-    var response = await channel.queryByChaincode(request);
-    return response.toString();
-     
+    var request = {
+        targets: peerName,
+        chaincodeId: CHAINCODE_ID,
+        fcn: 'DeleteModel',
+        args: [TOKEN, MODEL_ID, page_size.toString(), bookmark],
+        chainId: CHANNEL_NAME,
+        txId: tx_id
+    };
+
+    console.log("#0 Transaction id is: " + tx_id_string)
+    console.log("#1 Transaction proposal successfully sent to channel.")
+    try{
+        let results = await channel.sendTransactionProposal(request);
+        
+        // Array of proposal responses
+        var proposalResponses = results[0];
+
+        var proposal = results[1];
+
+        var all_good = true;
+        for (var i in proposalResponses) {
+            let good = false
+            if (proposalResponses && proposalResponses[i].response &&
+                proposalResponses[i].response.status === 200) {
+                good = true;
+                console.log(`\tChaincode invocation proposal response #${i} was good`);
+            } else {
+                console.log(`\tChaincode invocation proposal response #${i} was bad!`);
+            }
+            all_good = all_good & good
+        }
+        console.log("#2 Looped through the proposal responses all_good=", all_good)
+
+        await setupTxListener(tx_id_string, 'delete')
+        console.log('#3 Registered the Tx Listener')
+
+        var orderer_request = {
+            txId: tx_id,
+            proposalResponses: proposalResponses,
+            proposal: proposal
+        };
+
+        await channel.sendTransaction(orderer_request);
+        console.log("#4 Transaction has been submitted.")
+
+    }catch(e){
+        console.log(e);
+        submit_tx_map_delete.set(MODEL_ID, {is_completed: 'true', status: 'UNAUTHORIZED'});
+        return
+    }
+    
+
 }
 
-*/
+
 async function checkToken() {
 
     let peerName = channel.getChannelPeer(PEER_NAME)
@@ -291,21 +335,30 @@ async function setupTxListener(tx_id_string, type) {
             console.log('Transaction %s is in block %s', tx, block_num);
             
             if (code !== 'VALID') {
-                submit_tx_map_meta.set(MODEL_ID, {is_completed: 'true', status: 'CORRUPTED', pending: -1});
-            }
-
-            
-            let status = submit_tx_map_meta.get(MODEL_ID);
-            if (status.status === 'PENDING'){
-                let pending = status.pending - 1;
-                if (pending === 0){
-                    submit_tx_map_meta.set(MODEL_ID, {is_completed: 'true', status: 'VALID', pending: pending});
+                if (type == "delete"){
+                    submit_tx_map_delete.set(MODEL_ID, {is_completed: 'true', status: 'CORRUPTED'});
                 }else{
-                    submit_tx_map_meta.set(MODEL_ID, {is_completed: 'false', status: 'PENDING', pending: pending});
+                    submit_tx_map_meta.set(MODEL_ID, {is_completed: 'true', status: 'CORRUPTED', pending: -1});
                 }
             }
 
-            if (type === 'meta'){
+            if (type == "delete"){
+                submit_tx_map_delete.set(MODEL_ID, {is_completed: 'true', status: 'VALID'});
+            }else{
+                let status = submit_tx_map_meta.get(MODEL_ID);
+                if (status.status === 'PENDING'){
+                    let pending = status.pending - 1;
+                    if (pending === 0){
+                        submit_tx_map_meta.set(MODEL_ID, {is_completed: 'true', status: 'VALID', pending: pending});
+                    }else{
+                        submit_tx_map_meta.set(MODEL_ID, {is_completed: 'false', status: 'PENDING', pending: pending});
+                    }
+                }
+            }
+            
+            if (type == 'delete'){
+                console.log(MODEL_ID, 'delete', submit_tx_map_delete.get(MODEL_ID))
+            }else if (type === 'meta'){
                 console.log(MODEL_ID+'_metadata', submit_tx_map_meta.get(MODEL_ID))
             }else{
                 console.log(MODEL_ID, submit_tx_map_meta.get(MODEL_ID))
@@ -711,20 +764,26 @@ async function main() {
     client = await setupClient();
     channel = await setupChannel();
 
-    
+    /*
     //start REST server
     var server = app.listen(3000, function () {
         var host = server.address().address
         var port = server.address().port
         console.log("Example app listening at http://%s:%s", host, port)
     });
+    */
     
     
-    return
-
+    
     TOKEN = 'token';
     MODEL_ID = 'id_0';
-        
+    PAGE_SIZE = 10;
+    BOOKMARK = '';
+    
+    LAST = 'true';
+    await deleteModel(PAGE_SIZE, BOOKMARK);
+    
+    /*
     var TxMeta = {};
     TxMeta.model_id = MODEL_ID;
     TxMeta.tag1 = "tag1";
@@ -739,7 +798,7 @@ async function main() {
     TxPage.digest = "dummy digest 0";
     TxPage.page_bytes = 5
     
-    /*
+    
     var all_pages = JSON.stringify(compressJSON.compress(TxPage));
     var buf = Buffer.from(all_pages, 'utf8')
     let max_chunk_size = 50;
@@ -766,7 +825,8 @@ async function main() {
         await submitPage(pages[i]);
     }
     
-
+    
+    
     var model = {};
     let page_counter = 0;
     BOOKMARK = '';
@@ -802,6 +862,7 @@ async function main() {
     }
     console.log(ledger_entry);
     */
+
     //await getMeta();
     //await getTag1Meta("tag1", 3, '')
     //await getTag2Meta("tag2", 3, '')
