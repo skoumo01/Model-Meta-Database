@@ -316,8 +316,8 @@ func constructQueryResponseFromIterator(resultsIterator shim.StateQueryIteratorI
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
-// DeleteModel deletes the metadata and all the pages of a specific model from the world state: PENDING
-func (t *SimpleChaincode) DeleteModel(ctx contractapi.TransactionContextInterface, token, modelID string, pageSize int, bookmark string) error {
+// DeleteKeys deletes the keys in the given array
+func (t *SimpleChaincode) DeleteKeys(ctx contractapi.TransactionContextInterface, token string, keys []string) error {
 
 	tokenBytes, err := ctx.GetStub().GetState(token)
 	if err != nil {
@@ -328,34 +328,56 @@ func (t *SimpleChaincode) DeleteModel(ctx contractapi.TransactionContextInterfac
 		return fmt.Errorf("authorization not granded: token %s is invalid", token)
 	}
 
+	for _, key := range keys {
+		err = ctx.GetStub().DelState(key)
+		if err != nil {
+			return fmt.Errorf("failed to delete ledger entry %s: %v", key, err)
+		}
+	}
+
+	return nil
+}
+
+// GetKeys returns all the keys that much the provided adhoc
+func (t *SimpleChaincode) GetKeys(ctx contractapi.TransactionContextInterface, token, modelID, queryString string, pageSize int, bookmark string) ([]string, error) {
+
+	var keys []string
+
+	tokenBytes, err := ctx.GetStub().GetState(token)
+	if err != nil {
+		return keys, fmt.Errorf("failed to retrieve token %s from world state. %v", token, err)
+	}
+
+	if tokenBytes == nil {
+		return keys, fmt.Errorf("authorization not granded: token %s is invalid", token)
+	}
+
 	//retrieve the model's metadata
 	metaBytes, err := ctx.GetStub().GetState(modelID + "_metadata")
 	if err != nil {
-		return fmt.Errorf("failed to get metadata for model %s: %v", modelID, err)
+		return keys, fmt.Errorf("failed to get metadata for model %s: %v", modelID, err)
 	}
 	if metaBytes == nil {
-		return fmt.Errorf("model_id %s does not exist", modelID)
+		return keys, fmt.Errorf("model_id %s does not exist", modelID)
 	}
 
-	queryString := fmt.Sprintf(`{"selector":{"model_id":"%s"}}`, modelID)
 	book := bookmark
+
 	for true {
 		resultsIterator, responseMetadata, err := ctx.GetStub().GetQueryResultWithPagination(queryString, int32(pageSize), book)
 		if err != nil {
-			return err
+			return keys, err
 		}
 		defer resultsIterator.Close()
 
-		for resultsIterator.HasNext() { //delete ledger entries using the retrieved keys
+		for resultsIterator.HasNext() {
 			queryResult, err := resultsIterator.Next()
 			if err != nil {
-				return err
+				return keys, err
 			}
 
-			err = ctx.GetStub().DelState(queryResult.Key)
-			if err != nil {
-				return fmt.Errorf("failed to delete metadata of model %s: %v", queryResult.Key, err)
-			}
+			keys = append(keys, queryResult.Key)
+
 		}
 
 		if responseMetadata.FetchedRecordsCount == 0 {
@@ -366,7 +388,67 @@ func (t *SimpleChaincode) DeleteModel(ctx contractapi.TransactionContextInterfac
 
 	}
 
-	return nil
+	return keys, nil
+}
+
+func (t *SimpleChaincode) GetCleanUpKeys(ctx contractapi.TransactionContextInterface, token, modelID string, pageSize int, bookmark string) ([]string, error) {
+
+	var keys []string
+
+	tokenBytes, err := ctx.GetStub().GetState(token)
+	if err != nil {
+		return keys, fmt.Errorf("failed to retrieve token %s from world state. %v", token, err)
+	}
+
+	if tokenBytes == nil {
+		return keys, fmt.Errorf("authorization not granded: token %s is invalid", token)
+	}
+
+	//retrieve the model's metadata
+	metaBytes, err := ctx.GetStub().GetState(modelID + "_metadata")
+	if err != nil {
+		return keys, fmt.Errorf("failed to get metadata for model %s: %v", modelID, err)
+	}
+	if metaBytes == nil {
+		return keys, fmt.Errorf("model_id %s does not exist", modelID)
+	}
+
+	var meta MetaData
+	err = json.Unmarshal(metaBytes, &meta)
+	if err != nil {
+		return nil, err
+	}
+
+	queryString := fmt.Sprintf(`{"selector":{"$and":[{"model_id":"%s"},{"page_id": {"$gte":%d}}]}}`, modelID, meta.PageNumber)
+
+	book := bookmark
+
+	for true {
+		resultsIterator, responseMetadata, err := ctx.GetStub().GetQueryResultWithPagination(queryString, int32(pageSize), book)
+		if err != nil {
+			return keys, err
+		}
+		defer resultsIterator.Close()
+
+		for resultsIterator.HasNext() {
+			queryResult, err := resultsIterator.Next()
+			if err != nil {
+				return keys, err
+			}
+
+			keys = append(keys, queryResult.Key)
+
+		}
+
+		if responseMetadata.FetchedRecordsCount == 0 {
+			break
+		}
+
+		book = responseMetadata.Bookmark
+
+	}
+
+	return keys, nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////

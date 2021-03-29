@@ -7,6 +7,7 @@ const MD5 = require('crypto-js/md5');
 var app = express();
 var submit_tx_map_meta = new HashMap();
 var submit_tx_map_delete = new HashMap();
+var submit_tx_map_cleanup = new HashMap();
 var cors = require('cors');
 
 app.use(cors());
@@ -22,7 +23,7 @@ const USER_NAME = 'Admin';
 const PEER_NAME = 'peer0.org1.example.com';
 const CHANNEL_NAME = 'mychannel';
 const CHAINCODE_ID = 'contract_models';
-const MAX_CHUNK_SIZE = 16777216;//10MB
+const MAX_CHUNK_SIZE = 5;//16777216;//10MB
 var TOKEN = '';
 var MODEL_ID = '';    
 var TAG1 = '';
@@ -31,6 +32,8 @@ var MIN_TIMESTAMP = '';
 var MAX_TIMESTAMP = '';
 var PAGE_SIZE = '';
 var BOOKMARK = '';
+var DELETE_PAGE_SIZE = 10;
+var DELETE_BOOKMARK = '';
 var LAST = '';
 
 
@@ -54,7 +57,7 @@ var client = {}
 // Variable to hold the channel
 var channel = {}
 
-async function submitMeta(tx_data) {
+async function submitMeta(tx_data, token, model_id) {
 
     let peerName = channel.getChannelPeer(PEER_NAME)
 
@@ -65,7 +68,7 @@ async function submitMeta(tx_data) {
         targets: peerName,
         chaincodeId: CHAINCODE_ID,
         fcn: 'SubmitMeta',
-        args: [TOKEN, MODEL_ID, JSON.stringify(tx_data)],
+        args: [ token, model_id, JSON.stringify(tx_data)],
         chainId: CHANNEL_NAME,
         txId: tx_id
     };
@@ -94,7 +97,7 @@ async function submitMeta(tx_data) {
         }
         console.log("#2 Looped through the proposal responses all_good=", all_good)
 
-        await setupTxListener(tx_id_string, 'meta')//commented out for debugging
+        await setupTxListener(tx_id_string, 'meta', model_id)//commented out for debugging
         console.log('#3 Registered the Tx Listener')
 
         var orderer_request = {
@@ -107,14 +110,14 @@ async function submitMeta(tx_data) {
         console.log("#4 Transaction has been submitted.")
 
     }catch{
-        submit_tx_map_meta.set(MODEL_ID, {is_completed: 'true', status: 'UNAUTHORIZED', pending: -1});
+        submit_tx_map_meta.set(model_id, {is_completed: 'true', status: 'UNAUTHORIZED', pending: -1});
         return
     }
     
 
 }
 
-async function submitPage(tx_data) {
+async function submitPage(tx_data,  token, model_id) {
 
     let peerName = channel.getChannelPeer(PEER_NAME)
 
@@ -125,7 +128,7 @@ async function submitPage(tx_data) {
         targets: peerName,
         chaincodeId: CHAINCODE_ID,
         fcn: 'SubmitPage',
-        args: [TOKEN, MODEL_ID, JSON.stringify(tx_data)],
+        args: [ token, model_id, JSON.stringify(tx_data)],
         chainId: CHANNEL_NAME,
         txId: tx_id
     };
@@ -154,7 +157,7 @@ async function submitPage(tx_data) {
         }
         console.log("#2 Looped through the proposal responses all_good=", all_good)
 
-        await setupTxListener(tx_id_string, 'page')//commented out for debugging
+        await setupTxListener(tx_id_string, 'page', model_id)//commented out for debugging
         console.log('#3 Registered the Tx Listener')
 
         var orderer_request = {
@@ -167,14 +170,14 @@ async function submitPage(tx_data) {
         console.log("#4 Transaction has been submitted.")
 
     }catch{
-        submit_tx_map_meta.set(MODEL_ID, {is_completed: 'true', status: 'UNAUTHORIZED', pending: -1});
+        submit_tx_map_meta.set(model_id, {is_completed: 'true', status: 'UNAUTHORIZED', pending: -1});
         return
     }
     
 
 }
 
-async function getLastPages(page_size, bookmark) {
+async function getLastPages(page_size, bookmark,  token, model_id) {
 
     if (bookmark === "''" || bookmark === '""'){
         bookmark = '';
@@ -186,7 +189,7 @@ async function getLastPages(page_size, bookmark) {
          targets: peerName,
          chaincodeId: CHAINCODE_ID,
          fcn: 'QueryLatestModelWithPagination',
-         args: [TOKEN, MODEL_ID, page_size.toString(), bookmark]
+         args: [ token, model_id, page_size.toString(), bookmark]
      };
 
      // send the query proposal to the peer
@@ -196,7 +199,7 @@ async function getLastPages(page_size, bookmark) {
 
 }
 
-async function getMeta() {
+async function getMeta(token, model_id) {
 
     let peerName = channel.getChannelPeer(PEER_NAME)
 
@@ -204,7 +207,7 @@ async function getMeta() {
          targets: peerName,
          chaincodeId: CHAINCODE_ID,
          fcn: 'QueryMetaData',
-         args: [TOKEN, MODEL_ID]
+         args: [token, model_id]
      };
 
     // send the query proposal to the peer
@@ -214,7 +217,7 @@ async function getMeta() {
      
 }
 
-async function queryAdHocMeta(query_string, page_size, bookmark) {
+async function queryAdHocMeta(query_string, page_size, bookmark, token) {
 
     if (bookmark === "''" || bookmark === '""'){
         bookmark = '';
@@ -226,7 +229,7 @@ async function queryAdHocMeta(query_string, page_size, bookmark) {
          targets: peerName,
          chaincodeId: CHAINCODE_ID,
          fcn: 'QueryMetaDataWithPagination',
-         args: [TOKEN, query_string, page_size.toString(), bookmark]
+         args: [token, query_string, page_size.toString(), bookmark]
      };
 
      // send the query proposal to the peer
@@ -235,17 +238,17 @@ async function queryAdHocMeta(query_string, page_size, bookmark) {
 
 }
 
-async function getTag1Meta(tag1, page_size, bookmark){
-    return await queryAdHocMeta('{"selector":{"tag1":"' + tag1 + '"}, "use_index":["_design/indexTag1", "indexTag1"]}', page_size, bookmark);
+async function getTag1Meta(tag1, page_size, bookmark, token){
+    return await queryAdHocMeta('{"selector":{"tag1":"' + tag1 + '"}, "use_index":["_design/indexTag1", "indexTag1"]}', page_size, bookmark, token);
 }
-async function getTag2Meta(tag2, page_size, bookmark){
-    return await queryAdHocMeta('{"selector":{"tag2":"' + tag2 + '"}, "use_index":["_design/indexTag2", "indexTag2"]}', page_size, bookmark);
+async function getTag2Meta(tag2, page_size, bookmark, token){
+    return await queryAdHocMeta('{"selector":{"tag2":"' + tag2 + '"}, "use_index":["_design/indexTag2", "indexTag2"]}', page_size, bookmark, token);
 }
-async function getTag12Meta(tag1, tag2, page_size, bookmark){
-    return await queryAdHocMeta('{"selector":{"$and":[{"tag1":"' + tag1 + '"},{"tag2":"' + tag2 + '"}]}, "use_index":["_design/indexTag12", "indexTag12"]}', page_size, bookmark);
+async function getTag12Meta(tag1, tag2, page_size, bookmark, token){
+    return await queryAdHocMeta('{"selector":{"$and":[{"tag1":"' + tag1 + '"},{"tag2":"' + tag2 + '"}]}, "use_index":["_design/indexTag12", "indexTag12"]}', page_size, bookmark, token);
 }
 
-async function deleteModel(page_size, bookmark) {
+async function deleteKeys(keys, token, model_id, type) {
 
     let peerName = channel.getChannelPeer(PEER_NAME)
 
@@ -255,8 +258,8 @@ async function deleteModel(page_size, bookmark) {
     var request = {
         targets: peerName,
         chaincodeId: CHAINCODE_ID,
-        fcn: 'DeleteModel',
-        args: [TOKEN, MODEL_ID, page_size.toString(), bookmark],
+        fcn: 'DeleteKeys',
+        args: [token, keys.toString()],
         chainId: CHANNEL_NAME,
         txId: tx_id
     };
@@ -285,7 +288,7 @@ async function deleteModel(page_size, bookmark) {
         }
         console.log("#2 Looped through the proposal responses all_good=", all_good)
 
-        await setupTxListener(tx_id_string, 'delete')
+        await setupTxListener(tx_id_string, type, model_id)
         console.log('#3 Registered the Tx Listener')
 
         var orderer_request = {
@@ -299,15 +302,59 @@ async function deleteModel(page_size, bookmark) {
 
     }catch(e){
         console.log(e);
-        submit_tx_map_delete.set(MODEL_ID, {is_completed: 'true', status: 'UNAUTHORIZED'});
+        if (type === 'delete'){
+            submit_tx_map_delete.set(model_id, {is_completed: 'true', status: 'UNAUTHORIZED'});
+        }else if (type === 'cleanup'){
+            submit_tx_map_cleanup.set(model_id, {is_completed: 'true', status: 'UNAUTHORIZED'});
+        }
+        
         return
     }
     
 
 }
 
+async function getKeys(queryString, page_size, bookmark,  token, model_id) {
 
-async function checkToken() {
+    let peerName = channel.getChannelPeer(PEER_NAME)
+
+    let request = {
+         targets: peerName,
+         chaincodeId: CHAINCODE_ID,
+         fcn: 'GetKeys',
+         args: [token, model_id, queryString, page_size.toString(), bookmark]
+     };
+
+    // send the query proposal to the peer
+    var response = await channel.queryByChaincode(request);
+    
+    return response.toString();
+     
+}
+
+async function getDeleteKeys(token, model_id){
+    return getKeys(`{"selector":{"model_id":"` + model_id + `"}}`, DELETE_PAGE_SIZE, DELETE_BOOKMARK, token, model_id);
+}
+
+async function getCleanUpKeys(token, model_id) {
+
+    let peerName = channel.getChannelPeer(PEER_NAME)
+
+    let request = {
+         targets: peerName,
+         chaincodeId: CHAINCODE_ID,
+         fcn: 'GetCleanUpKeys',
+         args: [ token, model_id, DELETE_PAGE_SIZE.toString(), DELETE_BOOKMARK]
+     };
+
+    // send the query proposal to the peer
+    var response = await channel.queryByChaincode(request);
+    
+    return response.toString();
+     
+}
+
+async function checkToken(token) {
 
     let peerName = channel.getChannelPeer(PEER_NAME)
 
@@ -315,7 +362,7 @@ async function checkToken() {
          targets: peerName,
          chaincodeId: CHAINCODE_ID,
          fcn: 'CheckClientToken',
-         args: [TOKEN]
+         args: [token]
      };
 
      // send the query proposal to the peer
@@ -323,7 +370,7 @@ async function checkToken() {
     return response.toString();
 }
 
-async function setupTxListener(tx_id_string, type) {
+async function setupTxListener(tx_id_string, type, model_id) {
 
     try{
         let event_hub = channel.getChannelEventHub(PEER_NAME);
@@ -336,32 +383,38 @@ async function setupTxListener(tx_id_string, type) {
             
             if (code !== 'VALID') {
                 if (type == "delete"){
-                    submit_tx_map_delete.set(MODEL_ID, {is_completed: 'true', status: 'CORRUPTED'});
+                    submit_tx_map_delete.set(model_id, {is_completed: 'true', status: 'CORRUPTED'});
+                }else if (type == "cleanup"){
+                        submit_tx_map_cleanup.set(model_id, {is_completed: 'true', status: 'FAILED'});
                 }else{
-                    submit_tx_map_meta.set(MODEL_ID, {is_completed: 'true', status: 'CORRUPTED', pending: -1});
+                    submit_tx_map_meta.set(model_id, {is_completed: 'true', status: 'CORRUPTED', pending: -1});
                 }
             }
 
             if (type == "delete"){
-                submit_tx_map_delete.set(MODEL_ID, {is_completed: 'true', status: 'VALID'});
+                submit_tx_map_delete.set(model_id, {is_completed: 'true', status: 'VALID'});
+            }if (type == "cleanup"){
+                submit_tx_map_cleanup.set(model_id, {is_completed: 'true', status: 'VALID'});
             }else{
-                let status = submit_tx_map_meta.get(MODEL_ID);
+                let status = submit_tx_map_meta.get(model_id);
                 if (status.status === 'PENDING'){
                     let pending = status.pending - 1;
                     if (pending === 0){
-                        submit_tx_map_meta.set(MODEL_ID, {is_completed: 'true', status: 'VALID', pending: pending});
+                        submit_tx_map_meta.set(model_id, {is_completed: 'true', status: 'VALID', pending: pending});
                     }else{
-                        submit_tx_map_meta.set(MODEL_ID, {is_completed: 'false', status: 'PENDING', pending: pending});
+                        submit_tx_map_meta.set(model_id, {is_completed: 'false', status: 'PENDING', pending: pending});
                     }
                 }
             }
             
             if (type == 'delete'){
-                console.log(MODEL_ID, 'delete', submit_tx_map_delete.get(MODEL_ID))
+                console.log(model_id, 'delete', submit_tx_map_delete.get(model_id))
+            }else if (type == 'cleanup'){
+                console.log(model_id, 'cleanup', submit_tx_map_cleanup.get(model_id))
             }else if (type === 'meta'){
-                console.log(MODEL_ID+'_metadata', submit_tx_map_meta.get(MODEL_ID))
+                console.log(model_id+'_metadata', submit_tx_map_meta.get(model_id))
             }else{
-                console.log(MODEL_ID, submit_tx_map_meta.get(MODEL_ID))
+                console.log(model_id, submit_tx_map_meta.get(model_id))
             }
             
             //for (const [key, value] of submit_tx_map_meta.entries()) {
@@ -420,139 +473,29 @@ async function setupChannel() {
 /////////////////////////////////////////////////REST SERVER/////////////////////////////////////////////////////
 
 
-app.put('/submit', async function (req, res, next){
 
-    if (!req.body.hasOwnProperty('token')){
-        res.status(400).send({'message':'Bad Request Error: Property "token" is missing from request body.'});
-        return
-    }
-    TOKEN = req.body.token;
- 
-
-    if (!req.body.hasOwnProperty('data')){
-        res.status(400).send({'message':'Bad Request Error: Property "data" is missing from request body.'});
-        return
-    }
-    if (!req.body.data.hasOwnProperty('id') || !req.body.data.hasOwnProperty('tag1')
-        || !req.body.data.hasOwnProperty('tag2') || !req.body.data.hasOwnProperty('serialization_encoding')
-        || !req.body.data.hasOwnProperty('model') || !req.body.data.hasOwnProperty('weights')
-        || !req.body.data.hasOwnProperty('initialization') || !req.body.data.hasOwnProperty('checkpoints')){
-        res.status(400).send({'message':'Bad Request Error: Ensure all the required json properties are provided.'});
-        return
-    }
-    MODEL_ID = req.body.data.id;
-
-    // create metadata page|entry
-    var Tx_Meta = {};
-    Tx_Meta.model_id = MODEL_ID;
-    Tx_Meta.tag1 = req.body.data.tag1;
-    Tx_Meta.tag2 = req.body.data.tag2;
-    Tx_Meta.serialization_encoding = req.body.data.serialization_encoding;
-    
-
-    // create data pages
-    var Tx_Pages = {};
-    Tx_Pages.model = req.body.data.model;
-    Tx_Pages.weights = req.body.data.weights;
-    Tx_Pages.initialization = req.body.data.initialization;
-    Tx_Pages.checkpoints = req.body.data.checkpoints;
-
-    var all_pages = JSON.stringify(compressJSON.compress(Tx_Pages));
-    var buf = Buffer.from(all_pages, 'utf8')
-    var chunks = chunker(buf, MAX_CHUNK_SIZE);
-    var pages = [];
-    for (let i = 0; i < chunks.length; i++){
-        let Tx_Page = {
-            model_id: MODEL_ID,
-            page_id: i,
-            page_bytes: chunks[i].length,
-            data: chunks[i].toString(),
-            digest: MD5(chunks[i]).toString()
-        }   
-        pages.push(Tx_Page);
-    }
-    Tx_Meta.page_number = pages.length;
-   
-    try {
-        LAST = 'false';
-        submit_tx_map_meta.set(MODEL_ID, {is_completed: 'false', status: 'PENDING', pending: pages.length+1});
-        await submitMeta(Tx_Meta);
-        for (let i = 0; i < pages.length; i++){
-            if (i == pages.length-1){
-                LAST = 'true';
-            }
-            await submitPage(pages[i]);
-        }
-        res.status(200).send({'message':'OK'});
-    }catch(e){
-        console.log(e);
-        submit_tx_map_meta.set(MODEL_ID, {is_completed: 'false', status: 'ERROR', pending: -1});
-        res.status(500).send({'message':'Internal Server Error: Failed to submit model ' + MODEL_ID + '.'});
-        return
-    }
-
-});
-
-app.get('/check', async function(req, res, next){
+app.get("/model", async function(req, res, next){
 
     if (req.query.hasOwnProperty('token')){    
-        TOKEN = req.query.token;
-
-        try {
-            let response = await checkToken();
-            if (response.includes('false')){
-                res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + TOKEN
-                                        +'" is invalid'});
-                return
-            }
-            if (!req.query.hasOwnProperty('id')){
-                res.status(400).send({'message':'Bad Request Error: Ensure query parameter "id" is provided.'});
-                    return
-            }
-
-            MODEL_ID = req.query.id;
-            if (!submit_tx_map_meta.has(MODEL_ID)){
-                res.status(404).send({'message':'Not Found: Model with id "' + MODEL_ID + '" does not exist.'});
-                return
-            }
-            res.status(200).send(submit_tx_map_meta.get(MODEL_ID));
-        }catch(e){
-            res.status(500).send({'message':'Internal Server Error: Failed to validate token "' + TOKEN + '".'});
-            return
-        }
-
-    }else{
-        res.status(400).send({'message':'Bad Request Error: Query parameter "token" is missing.'});
-        return
-    }
-
-});
-
-app.get("/latest/model", async function(req, res, next){
-
-    if (req.query.hasOwnProperty('token')){    
-        TOKEN = req.query.token;
-
+        
         try {
             if (req.query.hasOwnProperty('id')){
-                MODEL_ID = req.query.id;
 
                 let model = {};
                 let page_counter = 0;
-                BOOKMARK = '';
-                PAGE_SIZE = 1;
+                let bookmark = '';
                 
                 while(true){ //get all the data pages
                     try{
-                        let response = await getLastPages(PAGE_SIZE, BOOKMARK);
+                        let response = await getLastPages(1, bookmark, req.query.token, req.query.id);
                         if (page_counter == 0 && response.includes('authorization')){
-                            res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + TOKEN
+                            res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + req.query.token
                                                     +'" is invalid'});
                             return
                         }
                         let page = JSON.parse(response);
                         model[page.records[0].Key] = page.records[0].Value;
-                        BOOKMARK = page.bookmark;
+                        bookmark = page.bookmark;
                         page_counter++;
                     }catch{
                         break;
@@ -564,7 +507,7 @@ app.get("/latest/model", async function(req, res, next){
                 }
                 let recovered = compressJSON.decompress(JSON.parse(data));
 
-                let response = await getMeta();
+                let response = await getMeta(req.query.token, req.query.id);
                 let meta = JSON.parse(response);
 
                 let ledger_entry = {
@@ -583,7 +526,7 @@ app.get("/latest/model", async function(req, res, next){
             }
         }catch(e){
             console.log(e);
-            res.status(404).send({'message':'Not Found: Model with id "' + MODEL_ID + '" does not exist.'});
+            res.status(404).send({'message':'Not Found: Model with id "' + req.query.id + '" does not exist.'});
             return
         }
 
@@ -594,16 +537,262 @@ app.get("/latest/model", async function(req, res, next){
 
 });
 
-app.get("/latest/metadata", async function(req, res, next){
+
+app.put('/model/submit', async function (req, res, next){
+
+    if (!req.body.hasOwnProperty('token')){
+        res.status(400).send({'message':'Bad Request Error: Property "token" is missing from request body.'});
+        return
+    }
+    
+
+    if (!req.body.hasOwnProperty('data')){
+        res.status(400).send({'message':'Bad Request Error: Property "data" is missing from request body.'});
+        return
+    }
+    if (!req.body.data.hasOwnProperty('id') || !req.body.data.hasOwnProperty('tag1')
+        || !req.body.data.hasOwnProperty('tag2') || !req.body.data.hasOwnProperty('serialization_encoding')
+        || !req.body.data.hasOwnProperty('model') || !req.body.data.hasOwnProperty('weights')
+        || !req.body.data.hasOwnProperty('initialization') || !req.body.data.hasOwnProperty('checkpoints')){
+        res.status(400).send({'message':'Bad Request Error: Ensure all the required json properties are provided.'});
+        return
+    }
+    
+    // create metadata page|entry
+    var Tx_Meta = {};
+    Tx_Meta.model_id = req.body.data.id;
+    Tx_Meta.tag1 = req.body.data.tag1;
+    Tx_Meta.tag2 = req.body.data.tag2;
+    Tx_Meta.serialization_encoding = req.body.data.serialization_encoding;
+    
+
+    // create data pages
+    var Tx_Pages = {};
+    Tx_Pages.model = req.body.data.model;
+    Tx_Pages.weights = req.body.data.weights;
+    Tx_Pages.initialization = req.body.data.initialization;
+    Tx_Pages.checkpoints = req.body.data.checkpoints;
+
+    var all_pages = JSON.stringify(compressJSON.compress(Tx_Pages));
+    var buf = Buffer.from(all_pages, 'utf8')
+    var chunks = chunker(buf, MAX_CHUNK_SIZE);
+    var pages = [];
+    for (let i = 0; i < chunks.length; i++){
+        let Tx_Page = {
+            model_id: req.body.data.id,
+            page_id: i,
+            page_bytes: chunks[i].length,
+            data: chunks[i].toString(),
+            digest: MD5(chunks[i]).toString()
+        }   
+        pages.push(Tx_Page);
+    }
+    Tx_Meta.page_number = pages.length;
+   
+    try {
+        LAST = 'false';
+        submit_tx_map_meta.set(req.body.data.id, {is_completed: 'false', status: 'PENDING', pending: pages.length+1});
+        await submitMeta(Tx_Meta, req.body.token, req.body.data.id);
+        for (let i = 0; i < pages.length; i++){
+            if (i == pages.length-1){
+                LAST = 'true';
+            }
+            await submitPage(pages[i],req.body.token, req.body.data.id);
+        }
+        res.status(200).send({'message':'OK'});
+    }catch(e){
+        console.log(e);
+        submit_tx_map_meta.set(req.body.data.id, {is_completed: 'false', status: 'ERROR', pending: -1});
+        res.status(500).send({'message':'Internal Server Error: Failed to submit model ' + req.body.data.id + '.'});
+        return
+    }
+
+});
+
+app.get('/model/submit/check', async function(req, res, next){
+
     if (req.query.hasOwnProperty('token')){    
-        TOKEN = req.query.token;
+        
+        try {
+            let response = await checkToken(req.query.token);
+            if (response.includes('false')){
+                res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + req.query.token
+                                        +'" is invalid'});
+                return
+            }
+            if (!req.query.hasOwnProperty('id')){
+                res.status(400).send({'message':'Bad Request Error: Ensure query parameter "id" is provided.'});
+                    return
+            }
+
+            
+            if (!submit_tx_map_meta.has(req.query.id)){
+                res.status(404).send({'message':'Not Found: Model with id "' + req.query.id + '" does not exist.'});
+                return
+            }
+            res.status(200).send(submit_tx_map_meta.get(req.query.id));
+        }catch(e){
+            res.status(500).send({'message':'Internal Server Error: Failed to validate token "' + req.query.token + '".'});
+            return
+        }
+
+    }else{
+        res.status(400).send({'message':'Bad Request Error: Query parameter "token" is missing.'});
+        return
+    }
+
+});
+
+app.get("/model/delete", async function(req, res, next){
+    if (req.query.hasOwnProperty('token')){    
+        
+        try {
+            if (req.query.hasOwnProperty('id')){
+                let response = await getDeleteKeys(req.query.token, req.query.id);
+                console.log(response);
+                if (response.includes('does not exist')){
+                    submit_tx_map_delete.set(req.query.id, {is_completed: 'true', status: 'ERROR'});
+                    res.status(404).send({'message':'Not Found: Model with id "' + req.query.id + '" does not exist.'});
+                    return
+                }
+                if (response.includes('authorization')){
+                    res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + req.query.token
+                                            +'" is invalid'});
+                    return
+                }  
+                submit_tx_map_delete.set(req.query.id, {is_completed: 'false', status: 'PENDING'});
+                await deleteKeys(response, req.query.token, req.query.id, 'delete');
+
+                res.status(200).send({'message': 'OK'});
+            }else{
+                res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
+            }
+        }catch(e){
+            submit_tx_map_delete.set(req.query.id, {is_completed: 'true', status: 'ERROR'});
+            res.status(404).send({'message':'Not Found: Model with id "' + req.query.id + '" does not exist.'});
+            return
+        }
+    }else{
+        res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
+        return
+    }
+});
+
+app.get('/model/delete/check', async function(req, res, next){
+
+    if (req.query.hasOwnProperty('token')){    
+        
+        try {
+            let response = await checkToken(req.query.token);
+            if (response.includes('false')){
+                res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + req.query.token
+                                        +'" is invalid'});
+                return
+            }
+            if (!req.query.hasOwnProperty('id')){
+                res.status(400).send({'message':'Bad Request Error: Ensure query parameter "id" is provided.'});
+                    return
+            }
+
+            
+            if (!submit_tx_map_delete.has(req.query.id)){
+                res.status(404).send({'message':'Not Found: Delete record for model with id "' + req.query.id + '" does not exist.'});
+                return
+            }
+            res.status(200).send(submit_tx_map_delete.get(req.query.id));
+        }catch(e){
+            res.status(500).send({'message':'Internal Server Error: Failed to validate token "' + req.query.token + '".'});
+            return
+        }
+
+    }else{
+        res.status(400).send({'message':'Bad Request Error: Query parameter "token" is missing.'});
+        return
+    }
+
+});
+
+app.get("/model/cleanup", async function(req, res, next){
+    if (req.query.hasOwnProperty('token')){    
+        
+        try {
+            if (req.query.hasOwnProperty('id')){
+                let response = await getCleanUpKeys(req.query.token, req.query.id);
+                console.log(response);
+                if (response.includes('does not exist')){
+                    submit_tx_map_cleanup.set(req.query.id, {is_completed: 'true', status: 'ERROR'});
+                    res.status(404).send({'message':'Not Found: Model with id "' + req.query.id + '" does not exist.'});
+                    return
+                }
+                if (response.includes('authorization')){
+                    res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + req.query.token
+                                            +'" is invalid'});
+                    return
+                }  
+                submit_tx_map_cleanup.set(req.query.id, {is_completed: 'false', status: 'PENDING'});
+                await deleteKeys(response, req.query.token, req.query.id, 'cleanup');
+
+                res.status(200).send({'message': 'OK'});
+            }else{
+                res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
+            }
+        }catch(e){
+            submit_tx_map_cleanup.set(req.query.id, {is_completed: 'true', status: 'ERROR'});
+            res.status(404).send({'message':'Not Found: Model with id "' + req.query.id + '" does not exist.'});
+            return
+        }
+    }else{
+        res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
+        return
+    }
+});
+
+
+app.get('/model/cleanup/check', async function(req, res, next){
+
+    if (req.query.hasOwnProperty('token')){    
+        
+        try {
+            let response = await checkToken(req.query.token);
+            if (response.includes('false')){
+                res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + req.query.token
+                                        +'" is invalid'});
+                return
+            }
+            if (!req.query.hasOwnProperty('id')){
+                res.status(400).send({'message':'Bad Request Error: Ensure query parameter "id" is provided.'});
+                    return
+            }
+
+            
+            if (!submit_tx_map_cleanup.has(req.query.id)){
+                res.status(404).send({'message':'Not Found: Cleanup record for model with id "' + req.query.id + '" does not exist.'});
+                return
+            }
+            res.status(200).send(submit_tx_map_cleanup.get(req.query.id));
+        }catch(e){
+            res.status(500).send({'message':'Internal Server Error: Failed to validate token "' + req.query.token + '".'});
+            return
+        }
+
+    }else{
+        res.status(400).send({'message':'Bad Request Error: Query parameter "token" is missing.'});
+        return
+    }
+
+});
+
+
+
+app.get("/metadata", async function(req, res, next){
+    if (req.query.hasOwnProperty('token')){    
 
         try {
             if (req.query.hasOwnProperty('id')){
-                MODEL_ID = req.query.id;
-                let response = await getMeta();
+                
+                let response = await getMeta(req.query.token, req.query.id);
                 if (response.includes('authorization')){
-                    res.status(401).send({'message':'Unauthorized: authorization not granded: token ' + TOKEN
+                    res.status(401).send({'message':'Unauthorized: authorization not granded: token ' + req.query.token
                                             +' is invalid'});
                     return
                 }
@@ -613,7 +802,7 @@ app.get("/latest/metadata", async function(req, res, next){
                 res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
             }
         }catch(e){
-            res.status(404).send({'message':'Not Found: Model with id "' + MODEL_ID + '" does not exist.'});
+            res.status(404).send({'message':'Not Found: Model with id "' + req.query.id + '" does not exist.'});
             return
         }
 
@@ -623,33 +812,28 @@ app.get("/latest/metadata", async function(req, res, next){
     }
 });
 
-app.get("/latest/tags", async function(req, res, next){
+app.get("/metadata/tags", async function(req, res, next){
 
     if (req.query.hasOwnProperty('token')){    
-        TOKEN = req.query.token;
-
+        
         if (!req.query.hasOwnProperty('page_size') || !req.query.hasOwnProperty('bookmark')){        
             res.status(400).send({'message':'Bad Request Error: Ensure  valid "page_size" and "bookmark" query' +
                                     ' parameters are provided.'});
                 return
         }
-        PAGE_SIZE = req.query.page_size;
-        BOOKMARK = req.query.bookmark;
 
         if (!req.query.hasOwnProperty('tag1') || !req.query.hasOwnProperty('tag2')){               
             res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
             return
         }
-        TAG1 = req.query.tag1;
-        TAG2 = req.query.tag2;
 
         try {          
-            var results = await getTag12Meta(TAG1, TAG2, PAGE_SIZE, BOOKMARK);
+            var results = await getTag12Meta(req.query.tag1, req.query.tag2, req.query.page_size, req.query.bookmark, req.query.token);
             try {
                 results = JSON.parse(results);
             }catch(e){
                 if (results.includes('authorization')){
-                    res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + TOKEN
+                    res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + req.query.token
                                             +'" is invalid'});
                     return
                 }         
@@ -667,33 +851,30 @@ app.get("/latest/tags", async function(req, res, next){
 
 });
 
-app.get("/latest/tags/tag1", async function(req, res, next){
+app.get("/metadata/tags/tag1", async function(req, res, next){
 
     if (req.query.hasOwnProperty('token')){    
-        TOKEN = req.query.token;
-
+        
         if (!req.query.hasOwnProperty('page_size') || !req.query.hasOwnProperty('bookmark')){        
             res.status(400).send({'message':'Bad Request Error: Ensure  valid "page_size" and "bookmark" query' +
                                     ' parameters are provided.'});
                 return
         }
-        PAGE_SIZE = req.query.page_size;
-        BOOKMARK = req.query.bookmark;
-
+        
+    
         if (!req.query.hasOwnProperty('tag1')){               
             res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
             return
         }
-        TAG1 = req.query.tag1;
-
+        
         try {          
-            var results = await getTag1Meta(TAG1, PAGE_SIZE, BOOKMARK);
+            var results = await getTag1Meta(req.query.tag1, req.query.page_size, req.query.bookmark, req.query.token);
 
             try {
                 results = JSON.parse(results);
             }catch{
                 if (results.includes('authorization')){
-                    res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + TOKEN
+                    res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + req.query.token
                                             +'" is invalid'});
                     return
                 }         
@@ -712,33 +893,29 @@ app.get("/latest/tags/tag1", async function(req, res, next){
 
 });
 
-app.get("/latest/tags/tag2",async function(req, res, next){
+app.get("/metadata/tags/tag2",async function(req, res, next){
 
     if (req.query.hasOwnProperty('token')){    
-        TOKEN = req.query.token;
 
         if (!req.query.hasOwnProperty('page_size') || !req.query.hasOwnProperty('bookmark')){        
             res.status(400).send({'message':'Bad Request Error: Ensure  valid "page_size" and "bookmark" query' +
                                     ' parameters are provided.'});
                 return
         }
-        PAGE_SIZE = req.query.page_size;
-        BOOKMARK = req.query.bookmark;
-
         if (!req.query.hasOwnProperty('tag2')){               
             res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
             return
         }
-        TAG2 = req.query.tag2;
+        
 
         try {          
-            var results = await getTag2Meta(TAG2, PAGE_SIZE, BOOKMARK);
+            var results = await getTag2Meta(req.query.tag2, req.query.page_size, req.query.bookmark, req.query.token);
 
             try {
                 results = JSON.parse(results);
             }catch{
                 if (results.includes('authorization')){
-                    res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + TOKEN
+                    res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + req.query.token
                                             +'" is invalid'});
                     return
                 }         
@@ -756,6 +933,7 @@ app.get("/latest/tags/tag2",async function(req, res, next){
     }
 
 });
+
 
 
 async function main() {
@@ -764,35 +942,37 @@ async function main() {
     client = await setupClient();
     channel = await setupChannel();
 
-    /*
+    
+    
     //start REST server
     var server = app.listen(3000, function () {
         var host = server.address().address
         var port = server.address().port
         console.log("Example app listening at http://%s:%s", host, port)
     });
-    */
     
     
+    return
     
-    TOKEN = 'token';
-    MODEL_ID = 'id_0';
-    PAGE_SIZE = 10;
-    BOOKMARK = '';
-    
-    LAST = 'true';
-    await deleteModel(PAGE_SIZE, BOOKMARK);
     
     /*
+    LAST = 'true';
+    let result = await getDeleteKeys('token', 'id_0');
+    console.log(result);
+    //result = await getCleanUpKeys('token', 'id_0');
+    //console.log(result);
+    await deleteKeys(result, 'token', 'id_0');
+    */
+    
     var TxMeta = {};
-    TxMeta.model_id = MODEL_ID;
+    TxMeta.model_id = "id_0";
     TxMeta.tag1 = "tag1";
     TxMeta.tag2 = "tag2";
     TxMeta.serialization_encoding = "base64";
     
     
     var TxPage = {};
-    TxPage.model_id = MODEL_ID;
+    TxPage.model_id = "id_0";
     TxPage.page_id = 0;
     TxPage.data = "data0";
     TxPage.digest = "dummy digest 0";
@@ -806,7 +986,7 @@ async function main() {
     var pages = [];
     for (let i = 0; i < chunks.length; i++){
         let Tx_Page = {
-            model_id: MODEL_ID,
+            model_id: "id_0",
             page_id: i,
             page_bytes: chunks[i].length,
             data: chunks[i].toString(),
@@ -814,29 +994,30 @@ async function main() {
         }   
         pages.push(Tx_Page);
     }
-    TxMeta.page_number = pages.length;
-    submit_tx_map_meta.set(MODEL_ID, {is_completed: 'false', status: 'PENDING', pending: pages.length+1});
-    await submitMeta(TxMeta);
+    
+    TxMeta.page_number = pages.length-1;
+    submit_tx_map_meta.set("id_0", {is_completed: 'false', status: 'PENDING', pending: pages.length+1});
+    await submitMeta(TxMeta, 'token', 'id_0');
+    
+    /*
     LAST = 'false';
     for (let i = 0; i < pages.length; i++){
         if (i == pages.length-1){
             LAST = 'true';
         }
-        await submitPage(pages[i]);
+        await submitPage(pages[i], 'token', 'id_0');
     }
-    
-    
-    
+
+    */
     var model = {};
     let page_counter = 0;
-    BOOKMARK = '';
-    PAGE_SIZE = 1;
+    let book = '';
     
     while(true){ //get all pages
         try{
-            let page = JSON.parse(await getLastPages(PAGE_SIZE, BOOKMARK));
+            let page = JSON.parse(await getLastPages(1, book, 'token', 'id_0'));
             model[page.records[0].Key] = page.records[0].Value;
-            BOOKMARK = page.bookmark;
+            book = page.bookmark;
             page_counter++;
         }catch{
             break;
@@ -848,7 +1029,7 @@ async function main() {
     }
     let recovered = compressJSON.decompress(JSON.parse(data));
     
-    let response = await getMeta();
+    let response = await getMeta('token', 'id_0');
     let meta = JSON.parse(response);
 
     let ledger_entry = {
@@ -861,12 +1042,12 @@ async function main() {
         checkpoints: recovered.checkpoints
     }
     console.log(ledger_entry);
-    */
+    
 
-    //await getMeta();
-    //await getTag1Meta("tag1", 3, '')
-    //await getTag2Meta("tag2", 3, '')
-    //await getTag12Meta("tag1", "tag2", 3, '')
+    //await getMeta('token', 'id_0');
+    //await getTag1Meta("tag1", 3, '', 'token')
+    //await getTag2Meta("tag2", 3, '', 'token')
+    //await getTag12Meta("tag1", "tag2", 3, '', 'token')
 
 }
 
