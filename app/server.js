@@ -3,6 +3,7 @@ const express = require('express');
 const HashMap = require('hashmap');
 const compressJSON = require('compress-json');
 const chunker = require('buffer-chunks');
+const bodyParser = require('body-parser');
 const MD5 = require('crypto-js/md5');
 var app = express();
 var submit_tx_map_meta = new HashMap();
@@ -11,8 +12,8 @@ var submit_tx_map_cleanup = new HashMap();
 var cors = require('cors');
 
 app.use(cors());
-app.use(express.json({limit: '500mb'}));
-app.use(express.urlencoded({limit: '500mb', extended: true }));
+app.use(bodyParser.json({limit: '1000mb', extended: true}));
+app.use(bodyParser.urlencoded({limit: '1000mb', extended: true}));
 
 //////////////////////////////////////////////BLOCKCHAIN CLIENT///////////////////////////////////////////////
 const Client = require('fabric-client');
@@ -23,7 +24,7 @@ const USER_NAME = 'Admin';
 const PEER_NAME = 'peer0.org1.example.com';
 const CHANNEL_NAME = 'mychannel';
 const CHAINCODE_ID = 'contract_models';
-const MAX_CHUNK_SIZE = 5;//16777216;//10MB
+const MAX_CHUNK_SIZE = 5242880;//5MB //16777216;//10MB
 var TOKEN = '';
 var MODEL_ID = '';    
 var TAG1 = '';
@@ -169,7 +170,8 @@ async function submitPage(tx_data,  token, model_id) {
         await channel.sendTransaction(orderer_request);
         console.log("#4 Transaction has been submitted.")
 
-    }catch{
+    }catch(e){
+        console.log(e);
         submit_tx_map_meta.set(model_id, {is_completed: 'true', status: 'UNAUTHORIZED', pending: -1});
         return
     }
@@ -474,7 +476,7 @@ async function setupChannel() {
 
 
 
-app.get("/model", async function(req, res, next){
+app.get("/model", wrapAsync(async function(req, res, next){
 
     if (req.query.hasOwnProperty('token')){    
         
@@ -535,11 +537,10 @@ app.get("/model", async function(req, res, next){
         return
     }
 
-});
+}));
 
 
-app.put('/model/submit', async function (req, res, next){
-
+app.put('/model/submit', wrapAsync(async function (req, res, next){
     if (!req.body.hasOwnProperty('token')){
         res.status(400).send({'message':'Bad Request Error: Property "token" is missing from request body.'});
         return
@@ -590,6 +591,7 @@ app.put('/model/submit', async function (req, res, next){
     Tx_Meta.page_number = pages.length;
    
     try {
+        res.status(200).send({'message':'OK'});
         LAST = 'false';
         submit_tx_map_meta.set(req.body.data.id, {is_completed: 'false', status: 'PENDING', pending: pages.length+1});
         await submitMeta(Tx_Meta, req.body.token, req.body.data.id);
@@ -599,7 +601,7 @@ app.put('/model/submit', async function (req, res, next){
             }
             await submitPage(pages[i],req.body.token, req.body.data.id);
         }
-        res.status(200).send({'message':'OK'});
+        //res.status(200).send({'message':'OK'});
     }catch(e){
         console.log(e);
         submit_tx_map_meta.set(req.body.data.id, {is_completed: 'false', status: 'ERROR', pending: -1});
@@ -607,9 +609,9 @@ app.put('/model/submit', async function (req, res, next){
         return
     }
 
-});
+}));
 
-app.get('/model/submit/check', async function(req, res, next){
+app.get('/model/submit/check', wrapAsync(async function(req, res, next){
 
     if (req.query.hasOwnProperty('token')){    
         
@@ -641,9 +643,9 @@ app.get('/model/submit/check', async function(req, res, next){
         return
     }
 
-});
+}));
 
-app.get("/model/delete", async function(req, res, next){
+app.get("/model/delete", wrapAsync(async function(req, res, next){
     if (req.query.hasOwnProperty('token')){    
         
         try {
@@ -676,9 +678,9 @@ app.get("/model/delete", async function(req, res, next){
         res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
         return
     }
-});
+}));
 
-app.get('/model/delete/check', async function(req, res, next){
+app.get('/model/delete/check', wrapAsync(async function(req, res, next){
 
     if (req.query.hasOwnProperty('token')){    
         
@@ -710,9 +712,9 @@ app.get('/model/delete/check', async function(req, res, next){
         return
     }
 
-});
+}));
 
-app.get("/model/cleanup", async function(req, res, next){
+app.get("/model/cleanup", wrapAsync(async function(req, res, next){
     if (req.query.hasOwnProperty('token')){    
         
         try {
@@ -745,10 +747,10 @@ app.get("/model/cleanup", async function(req, res, next){
         res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
         return
     }
-});
+}));
 
 
-app.get('/model/cleanup/check', async function(req, res, next){
+app.get('/model/cleanup/check', wrapAsync(async function(req, res, next){
 
     if (req.query.hasOwnProperty('token')){    
         
@@ -780,11 +782,9 @@ app.get('/model/cleanup/check', async function(req, res, next){
         return
     }
 
-});
+}));
 
-
-
-app.get("/metadata", async function(req, res, next){
+app.get("/metadata", wrapAsync(async function(req, res, next){
     if (req.query.hasOwnProperty('token')){    
 
         try {
@@ -810,9 +810,9 @@ app.get("/metadata", async function(req, res, next){
         res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
         return
     }
-});
+}));
 
-app.get("/metadata/tags", async function(req, res, next){
+app.get("/metadata/tags", wrapAsync(async function(req, res, next){
 
     if (req.query.hasOwnProperty('token')){    
         
@@ -849,9 +849,9 @@ app.get("/metadata/tags", async function(req, res, next){
         return
     }
 
-});
+}));
 
-app.get("/metadata/tags/tag1", async function(req, res, next){
+app.get("/metadata/tags/tag1", wrapAsync(async function(req, res, next){
 
     if (req.query.hasOwnProperty('token')){    
         
@@ -891,9 +891,9 @@ app.get("/metadata/tags/tag1", async function(req, res, next){
         return
     }
 
-});
+}));
 
-app.get("/metadata/tags/tag2",async function(req, res, next){
+app.get("/metadata/tags/tag2", wrapAsync(async function(req, res, next){
 
     if (req.query.hasOwnProperty('token')){    
 
@@ -932,9 +932,21 @@ app.get("/metadata/tags/tag2",async function(req, res, next){
         return
     }
 
+}));
+
+app.use(function(error, req, res, next) {
+    // Any request to this server will get here
+    console.log(error);
+    res.end();
 });
 
-
+function wrapAsync(fn) {
+    return function(req, res, next) {
+      // Make sure to `.catch()` any errors and pass them along to the `next()`
+      // middleware in the chain, in this case the error handler.
+      fn(req, res, next).catch(next);
+    };
+  }
 
 async function main() {
    
@@ -951,8 +963,8 @@ async function main() {
         console.log("Example app listening at http://%s:%s", host, port)
     });
     
-    
     return
+    
     
     
     /*
@@ -995,7 +1007,7 @@ async function main() {
         pages.push(Tx_Page);
     }
     
-    TxMeta.page_number = pages.length-1;
+    TxMeta.page_number = pages.length;
     submit_tx_map_meta.set("id_0", {is_completed: 'false', status: 'PENDING', pending: pages.length+1});
     await submitMeta(TxMeta, 'token', 'id_0');
     
@@ -1056,3 +1068,4 @@ if (require.main === module){
 }
 
 
+//node --max-old-space-size=4096 server.js
