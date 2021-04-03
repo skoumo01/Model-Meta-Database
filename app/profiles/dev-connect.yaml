@@ -57,12 +57,13 @@ channels:
 #
 orderers:
   orderer.example.com:
-    url: grpcs://localhost:7050
+    url: grpcs://10.16.30.54:7050
 
     # these are standard properties defined by the gRPC library
     # they will be passed in as-is to gRPC client constructor
     grpcOptions:
       ssl-target-name-override: orderer.example.com
+      grpc.NettyChannelBuilderOption.maxInboundMessageSize: 1048576
     tlsCACerts:
       path: ../network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
 
@@ -72,27 +73,31 @@ orderers:
 #
 peers:
   peer0.org1.example.com:
-    url: grpcs://localhost:7051
+    url: grpcs://10.16.30.54:7051
     grpcOptions:
       ssl-target-name-override: peer0.org1.example.com
+      grpc.NettyChannelBuilderOption.maxInboundMessageSize: 1048576
     tlsCACerts:
       path: ../network/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/msp/tlscacerts/tlsca.org1.example.com-cert.pem
   peer1.org1.example.com:
-    url: grpcs://localhost:8051
+    url: grpcs://10.16.30.54:8051
     grpcOptions:
       ssl-target-name-override: peer1.org1.example.com
+      grpc.NettyChannelBuilderOption.maxInboundMessageSize: 1048576
     tlsCACerts:
       path: ../network/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/msp/tlscacerts/tlsca.org1.example.com-cert.pem
 
   peer0.org2.example.com:
-    url: grpcs://localhost:9051
+    url: grpcs://10.16.30.54:9051
     grpcOptions:
       ssl-target-name-override: peer0.org2.example.com
+      grpc.NettyChannelBuilderOption.maxInboundMessageSize: 1048576
     tlsCACerts:
       path: ../network/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/msp/tlscacerts/tlsca.org2.example.com-cert.pem
   peer1.org2.example.com:
-    url: grpcs://localhost:10051
+    url: grpcs://10.16.30.54:10051
     grpcOptions:
       ssl-target-name-override: peer1.org2.example.com
+      grpc.NettyChannelBuilderOption.maxInboundMessageSize: 1048576
     tlsCACerts:
       path: ../network/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/msp/tlscacerts/tlsca.org2.example.com-cert.pem

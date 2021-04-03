@@ -5,6 +5,7 @@ const compressJSON = require('compress-json');
 const chunker = require('buffer-chunks');
 const bodyParser = require('body-parser');
 const MD5 = require('crypto-js/md5');
+const compression = require('compression');
 var app = express();
 var submit_tx_map_meta = new HashMap();
 var submit_tx_map_delete = new HashMap();
@@ -12,6 +13,7 @@ var submit_tx_map_cleanup = new HashMap();
 var cors = require('cors');
 
 app.use(cors());
+app.use(compression());
 app.use(bodyParser.json({limit: '1000mb', extended: true}));
 app.use(bodyParser.urlencoded({limit: '1000mb', extended: true}));
 
@@ -505,6 +507,11 @@ app.get("/model", wrapAsync(async function(req, res, next){
                 }
                 var data = "";
                 for (let i = 0; i < page_counter; i++){
+                    let temp_digest = MD5(model[i].data).toString();
+                    if (!(temp_digest === model[i].digest)){
+                        res.status(500).send({'message':'Internal Server Error: Model data are corrupted.'});
+                        return
+                    }
                     data += model[i].data;
                 }
                 let recovered = compressJSON.decompress(JSON.parse(data));
@@ -584,7 +591,7 @@ app.put('/model/submit', wrapAsync(async function (req, res, next){
             page_id: i,
             page_bytes: chunks[i].length,
             data: chunks[i].toString(),
-            digest: MD5(chunks[i]).toString()
+            digest: MD5(chunks[i].toString()).toString()
         }   
         pages.push(Tx_Page);
     }
