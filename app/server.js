@@ -38,6 +38,7 @@ var BOOKMARK = '';
 var DELETE_PAGE_SIZE = 10;
 var DELETE_BOOKMARK = '';
 var LAST = '';
+var START_TIMER = 0;
 
 
 // Constants for profile
@@ -391,6 +392,7 @@ async function setupTxListener(tx_id_string, type, model_id) {
                 }else if (type == "cleanup"){
                         submit_tx_map_cleanup.set(model_id, {is_completed: 'true', status: 'FAILED'});
                 }else{
+                    console.log('submit-INVALID', new Date().getTime() - START_TIMER);// the time it took before the corruption was detected
                     submit_tx_map_meta.set(model_id, {is_completed: 'true', status: 'CORRUPTED', pending: -1});
                 }
             }
@@ -404,6 +406,7 @@ async function setupTxListener(tx_id_string, type, model_id) {
                 if (status.status === 'PENDING'){
                     let pending = status.pending - 1;
                     if (pending === 0){
+                        console.log('submit-VALID', new Date().getTime() - START_TIMER);// the time it took to submit all the pages
                         submit_tx_map_meta.set(model_id, {is_completed: 'true', status: 'VALID', pending: pending});
                     }else{
                         submit_tx_map_meta.set(model_id, {is_completed: 'false', status: 'PENDING', pending: pending});
@@ -479,7 +482,7 @@ async function setupChannel() {
 
 
 app.get("/model", wrapAsync(async function(req, res, next){
-
+    let start_timer = new Date().getTime();//milliseconds
     if (req.query.hasOwnProperty('token')){    
         
         try {
@@ -493,6 +496,7 @@ app.get("/model", wrapAsync(async function(req, res, next){
                     try{
                         let response = await getLastPages(1, bookmark, req.query.token, req.query.id);
                         if (page_counter == 0 && response.includes('authorization')){
+                            console.log('retrieve', new Date().getTime() - start_timer);
                             res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + req.query.token
                                                     +'" is invalid'});
                             return
@@ -509,6 +513,7 @@ app.get("/model", wrapAsync(async function(req, res, next){
                 for (let i = 0; i < page_counter; i++){
                     let temp_digest = MD5(model[i].data).toString();
                     if (!(temp_digest === model[i].digest)){
+                        console.log('retrieve', new Date().getTime() - start_timer);
                         res.status(500).send({'message':'Internal Server Error: Model data are corrupted.'});
                         return
                     }
@@ -528,18 +533,22 @@ app.get("/model", wrapAsync(async function(req, res, next){
                     initialization: recovered.initialization,
                     checkpoints: recovered.checkpoints
                 }
-
+                
+                console.log('retrieve', new Date().getTime() - start_timer);
                 res.status(200).send(ledger_entry);
             }else{
+                console.log('retrieve', new Date().getTime() - start_timer);
                 res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
             }
         }catch(e){
             console.log(e);
+            console.log('retrieve', new Date().getTime() - start_timer);
             res.status(404).send({'message':'Not Found: Model with id "' + req.query.id + '" does not exist.'});
             return
         }
 
     }else{
+        console.log('retrieve', new Date().getTime() - start_timer);
         res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
         return
     }
@@ -548,13 +557,16 @@ app.get("/model", wrapAsync(async function(req, res, next){
 
 
 app.put('/model/submit', wrapAsync(async function (req, res, next){
+    let start_timer = new Date().getTime();//milliseconds
     if (!req.body.hasOwnProperty('token')){
+        console.log('submit', new Date().getTime() - start_timer);
         res.status(400).send({'message':'Bad Request Error: Property "token" is missing from request body.'});
         return
     }
     
 
     if (!req.body.hasOwnProperty('data')){
+        console.log('submit', new Date().getTime() - start_timer);
         res.status(400).send({'message':'Bad Request Error: Property "data" is missing from request body.'});
         return
     }
@@ -562,8 +574,9 @@ app.put('/model/submit', wrapAsync(async function (req, res, next){
         || !req.body.data.hasOwnProperty('tag2') || !req.body.data.hasOwnProperty('serialization_encoding')
         || !req.body.data.hasOwnProperty('model') || !req.body.data.hasOwnProperty('weights')
         || !req.body.data.hasOwnProperty('initialization') || !req.body.data.hasOwnProperty('checkpoints')){
-        res.status(400).send({'message':'Bad Request Error: Ensure all the required json properties are provided.'});
-        return
+            console.log('submit', new Date().getTime() - start_timer);
+            res.status(400).send({'message':'Bad Request Error: Ensure all the required json properties are provided.'});
+            return
     }
     
     // create metadata page|entry
@@ -605,13 +618,14 @@ app.put('/model/submit', wrapAsync(async function (req, res, next){
         for (let i = 0; i < pages.length; i++){
             if (i == pages.length-1){
                 LAST = 'true';
+                START_TIMER = start_timer;
             }
             await submitPage(pages[i],req.body.token, req.body.data.id);
         }
-        //res.status(200).send({'message':'OK'});
     }catch(e){
         console.log(e);
         submit_tx_map_meta.set(req.body.data.id, {is_completed: 'false', status: 'ERROR', pending: -1});
+        console.log('submit', new Date().getTime() - start_timer);
         res.status(500).send({'message':'Internal Server Error: Failed to submit model ' + req.body.data.id + '.'});
         return
     }
