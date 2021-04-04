@@ -534,7 +534,7 @@ app.get("/model", wrapAsync(async function(req, res, next){
                     checkpoints: recovered.checkpoints
                 }
                 
-                console.log('retrieve', new Date().getTime() - start_timer);
+                console.log('retrieve-VALID', new Date().getTime() - start_timer);
                 res.status(200).send(ledger_entry);
             }else{
                 console.log('retrieve', new Date().getTime() - start_timer);
