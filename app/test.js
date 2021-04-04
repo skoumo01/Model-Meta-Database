@@ -238,7 +238,7 @@ function darknet_yolo(){ // ~200 MB
 function main(){
 	
 	
-	var data = tflite_example();
+	var data = tf_saved_model_example_normal();
 
 	const options = {
 	  hostname: '10.16.30.89',
