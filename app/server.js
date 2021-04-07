@@ -1069,4 +1069,4 @@ if (require.main === module){
 
 
 
-//node --max-old-space-size=4096 server.js
+//node --max-old-space-size=4096 server.js compress-json 10 false
