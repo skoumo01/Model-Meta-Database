@@ -9,8 +9,9 @@ const bodyParser = require('body-parser');
 
 const compressJSON = require('compress-json');  // compress-json
 const cjson = require('compressed-json');       // compressed-json
-const jsonpack = require('jsonpack/main')       //jsonpack
-const { stringify, parse } = require('zipson'); //zipson
+const jsonpack = require('jsonpack/main')       // jsonpack
+const { stringify, parse } = require('zipson'); // zipson
+
 
 const chunker = require('buffer-chunks');
 const MD5 = require('crypto-js/md5');
@@ -23,8 +24,9 @@ var submit_tx_map_cleanup = new HashMap();
 
 
 var myArgs = process.argv.slice(2);
-const COMPRESSION_ALGO = myArgs[0];
-
+const COMPRESSION_ALGO = myArgs[0]; //compress-json | compressed-json | jsonpack | zipson
+const CHUNK_SIZE = parseInt(myArgs[1]);
+const MAX_CHUNK_SIZE = CHUNK_SIZE* 1024 * 1024; //MB -> bytes
 
 app.use(cors());
 app.use(compression());
@@ -38,7 +40,6 @@ const USER_NAME = 'Admin';
 const PEER_NAME = 'peer0.org1.example.com';
 const CHANNEL_NAME = 'mychannel';
 const CHAINCODE_ID = 'contract_models';
-const MAX_CHUNK_SIZE = 20971520; //20MB //16777216;//10MB //5242880;//5MB
 const DELETE_PAGE_SIZE = 10;
 const DELETE_BOOKMARK = '';
 var LAST = '';
@@ -613,6 +614,7 @@ app.put('/model/submit', wrapAsync(async function (req, res, next){
 
     var all_pages = '';
 
+
     if (COMPRESSION_ALGO === 'compress-json'){
         all_pages = JSON.stringify(compressJSON.compress(Tx_Pages));
     }else if (COMPRESSION_ALGO === 'compressed-json'){
@@ -626,7 +628,12 @@ app.put('/model/submit', wrapAsync(async function (req, res, next){
     }
 
     var buf = Buffer.from(all_pages, 'utf8')
-    var chunks = chunker(buf, MAX_CHUNK_SIZE);
+    if (CHUNK_SIZE === -1){
+        var chunks = [all_pages];
+        console.log(chunks.length);
+    }else{
+        var chunks = chunker(buf, MAX_CHUNK_SIZE);
+    }
     var pages = [];
     for (let i = 0; i < chunks.length; i++){
         let Tx_Page = {
@@ -1008,129 +1015,19 @@ async function main() {
     
     //start REST server
     var server = app.listen(3000, function () {
-        var host = server.address().address
-        var port = server.address().port
-        console.log("Example app listening at http://%s:%s", host, port)
+        var host = server.address().address;
+        var port = server.address().port;
+        console.log("Chunk size set to %dMB", CHUNK_SIZE);
+        console.log("Example app listening at http://%s:%s", host, port);
     });
     
-
-    return
-
-    var TxMeta = {};
-    TxMeta.model_id = "id_0";
-    TxMeta.tag1 = "tag1";
-    TxMeta.tag2 = "tag2";
-    TxMeta.serialization_encoding = "base64";
-    
-    
-    var Tx_Pages = {};
-    Tx_Pages.model_id = "id_0";
-    Tx_Pages.page_id = 0;
-    Tx_Pages.data = "data0";
-    Tx_Pages.digest = "dummy digest 0";
-    Tx_Pages.page_bytes = 5
-    
-    var all_pages = '';
-
-    if (COMPRESSION_ALGO === 'compress-json'){
-        all_pages = JSON.stringify(compressJSON.compress(Tx_Pages));
-    }else if (COMPRESSION_ALGO === 'compressed-json'){
-        all_pages = cjson.compress.toString(Tx_Pages);
-    }else if (COMPRESSION_ALGO === 'jsonpack'){
-        all_pages = JSON.stringify(jsonpack.pack(Tx_Pages));
-    }else if(COMPRESSION_ALGO === 'zipson'){
-        all_pages = JSON.stringify(stringify(Tx_Pages));
-    }else{
-        all_pages = JSON.stringify(Tx_Pages);
-    }
-
-
-    var buf = Buffer.from(all_pages, 'utf8')
-    let max_chunk_size = 50;
-    var chunks = chunker(buf, max_chunk_size);
-    var pages = [];
-    for (let i = 0; i < chunks.length; i++){
-        let Tx_Page = {
-            model_id: "id_0",
-            page_id: i,
-            page_bytes: chunks[i].length,
-            data: chunks[i].toString(),
-            digest: MD5(chunks[i]).toString()
-        }   
-        pages.push(Tx_Page);
-    }
-    
-    TxMeta.page_number = pages.length;
-    submit_tx_map_meta.set("id_0", {is_completed: 'false', status: 'PENDING', pending: pages.length+1});
-    //await submitMeta(TxMeta, 'token', 'id_0');
-    
-
-    LAST = 'false';
-    for (let i = 0; i < pages.length; i++){
-        if (i == pages.length-1){
-            LAST = 'true';
-        }
-        //await submitPage(pages[i], 'token', 'id_0');
-    }
-
-    //return
-    
-    var model = {};
-    let page_counter = 0;
-    let book = '';
-    
-    while(true){ //get all pages
-        try{
-            let page = JSON.parse(await getLastPages(1, book, 'token', 'id_0'));
-            model[page.records[0].Key] = page.records[0].Value;
-            book = page.bookmark;
-            page_counter++;
-        }catch{
-            break;
-        }
-    }
-    var data = "";
-    for (let i = 0; i < page_counter; i++){
-        data += model[i].data;
-    }
-
-
-    var recovered = {};
-
-    if (COMPRESSION_ALGO === 'compress-json'){
-        recovered = compressJSON.decompress(JSON.parse(data));
-    }else if (COMPRESSION_ALGO === 'compressed-json'){
-        recovered = cjson.decompress.fromString(data);
-    }else if (COMPRESSION_ALGO === 'jsonpack'){
-        recovered = jsonpack.unpack(JSON.parse(data));
-    }else if(COMPRESSION_ALGO === 'zipson'){
-        recovered = parse(JSON.parse(data));
-    }else{
-        recovered = JSON.parse(data);
-    }
-
-
-    let response = await getMeta('token', 'id_0');
-    let meta = JSON.parse(response);
-
-    let ledger_entry = {
-        tag1: meta.tag1,
-        tag2: meta.tag2,
-        serialization_encoding: meta.serialization_encoding,
-        model: recovered.model,
-        weights: recovered.weights,
-        initialization: recovered.initialization,
-        checkpoints: recovered.checkpoints
-    }
-    console.log(JSON.stringify(ledger_entry));
-    
-    
-
 }
 
 if (require.main === module){
     main();
 }
+
+
 
 
 //node --max-old-space-size=4096 server.js

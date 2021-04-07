@@ -235,10 +235,9 @@ function darknet_yolo(){ // ~200 MB
 	return data;
 }
 
-function main(){
+function submit(){
 	
-	
-	var data = tf_saved_model_example_normal();
+	var data = darknet_yolo();
 
 	const options = {
 	  hostname: '10.16.30.89',
@@ -267,4 +266,32 @@ function main(){
 	req.end()
 }
 
-main()
+function retrieve(){
+
+	var model_id = 'tf_saved_model_example_normal';
+
+	const options = {
+		hostname: '10.16.30.89',
+		port: 3000,
+		path: '/model?id='+model_id+'&token=token',
+		method: 'GET'
+	  }
+	  
+	  const req = http.request(options, res => {
+		console.log(`statusCode: ${res.statusCode}`)
+	  
+		res.on('data', d => {
+		  process.stdout.write(d)
+		})
+	  })
+	  
+	  req.on('error', error => {
+		console.error(error)
+	  })
+	  
+	  req.end()
+
+}
+
+submit()
+//retrieve();
