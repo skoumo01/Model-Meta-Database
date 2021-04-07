@@ -27,6 +27,7 @@ var myArgs = process.argv.slice(2);
 const COMPRESSION_ALGO = myArgs[0]; //compress-json | compressed-json | jsonpack | zipson
 const CHUNK_SIZE = parseInt(myArgs[1]);
 const MAX_CHUNK_SIZE = CHUNK_SIZE* 1024 * 1024; //MB -> bytes
+const DEBUG  = myArgs[2];
 
 app.use(cors());
 app.use(compression());
@@ -82,8 +83,10 @@ async function submitMeta(tx_data, token, model_id) {
         txId: tx_id
     };
 
-    console.log("#0 Transaction id is: " + tx_id_string)
-    console.log("#1 Transaction proposal successfully sent to channel.")
+    if (DEBUG === 'true'){
+        console.log("#0 Transaction id is: " + tx_id_string)
+        console.log("#1 Transaction proposal successfully sent to channel.")
+    }
     try{
         let results = await channel.sendTransactionProposal(request);
         
@@ -98,16 +101,22 @@ async function submitMeta(tx_data, token, model_id) {
             if (proposalResponses && proposalResponses[i].response &&
                 proposalResponses[i].response.status === 200) {
                 good = true;
-                console.log(`\tChaincode invocation proposal response #${i} was good`);
+                if (DEBUG === 'true'){
+                    console.log(`\tChaincode invocation proposal response #${i} was good`);
+                }
             } else {
                 console.log(`\tChaincode invocation proposal response #${i} was bad!`);
             }
             all_good = all_good & good
         }
-        console.log("#2 Looped through the proposal responses all_good=", all_good)
+        if (DEBUG === 'true'){
+            console.log("#2 Looped through the proposal responses all_good=", all_good)
+        }
 
         await setupTxListener(tx_id_string, 'meta', model_id)//commented out for debugging
-        console.log('#3 Registered the Tx Listener')
+        if (DEBUG === 'true'){
+            console.log('#3 Registered the Tx Listener')
+        }
 
         var orderer_request = {
             txId: tx_id,
@@ -116,7 +125,9 @@ async function submitMeta(tx_data, token, model_id) {
         };
 
         await channel.sendTransaction(orderer_request);
-        console.log("#4 Transaction has been submitted.")
+        if (DEBUG === 'true'){
+            console.log("#4 Transaction has been submitted.")
+        }
 
     }catch{
         submit_tx_map_meta.set(model_id, {is_completed: 'true', status: 'UNAUTHORIZED', pending: -1});
@@ -142,8 +153,10 @@ async function submitPage(tx_data,  token, model_id) {
         txId: tx_id
     };
 
-    console.log("#0 Transaction id is: " + tx_id_string)
-    console.log("#1 Transaction proposal successfully sent to channel.")
+    if (DEBUG === 'true'){
+        console.log("#0 Transaction id is: " + tx_id_string)
+        console.log("#1 Transaction proposal successfully sent to channel.")
+    }
     try{
         let results = await channel.sendTransactionProposal(request);
         
@@ -158,16 +171,22 @@ async function submitPage(tx_data,  token, model_id) {
             if (proposalResponses && proposalResponses[i].response &&
                 proposalResponses[i].response.status === 200) {
                 good = true;
-                console.log(`\tChaincode invocation proposal response #${i} was good`);
+                if (DEBUG === 'true'){
+                    console.log(`\tChaincode invocation proposal response #${i} was good`);
+                }
             } else {
                 console.log(`\tChaincode invocation proposal response #${i} was bad!`);
             }
             all_good = all_good & good
         }
-        console.log("#2 Looped through the proposal responses all_good=", all_good)
+        if (DEBUG === 'true'){
+            console.log("#2 Looped through the proposal responses all_good=", all_good)
+        }
 
         await setupTxListener(tx_id_string, 'page', model_id)//commented out for debugging
-        console.log('#3 Registered the Tx Listener')
+        if (DEBUG === 'true'){
+            console.log('#3 Registered the Tx Listener')
+        }
 
         var orderer_request = {
             txId: tx_id,
@@ -176,7 +195,9 @@ async function submitPage(tx_data,  token, model_id) {
         };
 
         await channel.sendTransaction(orderer_request);
-        console.log("#4 Transaction has been submitted.")
+        if (DEBUG === 'true'){
+            console.log("#4 Transaction has been submitted.")
+        }
 
     }catch(e){
         console.log(e);
@@ -274,8 +295,10 @@ async function deleteKeys(keys, token, model_id, type) {
         txId: tx_id
     };
 
-    console.log("#0 Transaction id is: " + tx_id_string)
-    console.log("#1 Transaction proposal successfully sent to channel.")
+    if (DEBUG === 'true'){
+        console.log("#0 Transaction id is: " + tx_id_string)
+        console.log("#1 Transaction proposal successfully sent to channel.")
+    }
     try{
         let results = await channel.sendTransactionProposal(request);
         
@@ -290,16 +313,22 @@ async function deleteKeys(keys, token, model_id, type) {
             if (proposalResponses && proposalResponses[i].response &&
                 proposalResponses[i].response.status === 200) {
                 good = true;
-                console.log(`\tChaincode invocation proposal response #${i} was good`);
+                if (DEBUG === 'true'){
+                    console.log(`\tChaincode invocation proposal response #${i} was good`);
+                }
             } else {
                 console.log(`\tChaincode invocation proposal response #${i} was bad!`);
             }
             all_good = all_good & good
         }
-        console.log("#2 Looped through the proposal responses all_good=", all_good)
+        if (DEBUG === 'true'){
+            console.log("#2 Looped through the proposal responses all_good=", all_good)
+        }
 
         await setupTxListener(tx_id_string, type, model_id)
-        console.log('#3 Registered the Tx Listener')
+        if (DEBUG === 'true'){
+            console.log('#3 Registered the Tx Listener')
+        }
 
         var orderer_request = {
             txId: tx_id,
@@ -308,7 +337,9 @@ async function deleteKeys(keys, token, model_id, type) {
         };
 
         await channel.sendTransaction(orderer_request);
-        console.log("#4 Transaction has been submitted.")
+        if (DEBUG === 'true'){
+            console.log("#4 Transaction has been submitted.")
+        }
 
     }catch(e){
         console.log(e);
@@ -386,10 +417,12 @@ async function setupTxListener(tx_id_string, type, model_id) {
         let event_hub = channel.getChannelEventHub(PEER_NAME);
 
         event_hub.registerTxEvent(tx_id_string, (tx, code, block_num) => {
-                    
-            console.log("#5 Received Tx Event")
-            console.log('The chaincode invoke chaincode transaction has been committed on peer %s', event_hub.getPeerAddr());
-            console.log('Transaction %s is in block %s', tx, block_num);
+             
+            if (DEBUG === 'true'){
+                console.log("#5 Received Tx Event")
+                console.log('The chaincode invoke chaincode transaction has been committed on peer %s', event_hub.getPeerAddr());
+                console.log('Transaction %s is in block %s', tx, block_num);
+            }
             
             if (code !== 'VALID') {
                 if (type == "delete"){
@@ -411,7 +444,7 @@ async function setupTxListener(tx_id_string, type, model_id) {
                 if (status.status === 'PENDING'){
                     let pending = status.pending - 1;
                     if (pending === 0){
-                        console.log('submit-VALID', new Date().getTime() - START_TIMER);// the time it took to submit all the pages
+                        console.log('submit_time_valid', new Date().getTime() - START_TIMER);// the time it took to submit all the pages
                         submit_tx_map_meta.set(model_id, {is_completed: 'true', status: 'VALID', pending: pending});
                     }else{
                         submit_tx_map_meta.set(model_id, {is_completed: 'false', status: 'PENDING', pending: pending});
@@ -497,11 +530,15 @@ app.get("/model", wrapAsync(async function(req, res, next){
                 let page_counter = 0;
                 let bookmark = '';
                 
+                let retrieve_preprocessing_time = new Date().getTime();
+                let sub = 0;
                 while(true){ //get all the data pages
                     try{
+                        let start_timer2 = new Date().getTime();//milliseconds
                         let response = await getLastPages(1, bookmark, req.query.token, req.query.id);
+                        sub += new Date().getTime() - start_timer2;
                         if (page_counter == 0 && response.includes('authorization')){
-                            console.log('retrieve', new Date().getTime() - start_timer);
+                            console.log('retrieve_time', new Date().getTime() - start_timer);
                             res.status(401).send({'message':'Unauthorized: authorization not granded: token "' + req.query.token
                                                     +'" is invalid'});
                             return
@@ -518,7 +555,7 @@ app.get("/model", wrapAsync(async function(req, res, next){
                 for (let i = 0; i < page_counter; i++){
                     let temp_digest = MD5(model[i].data).toString();
                     if (!(temp_digest === model[i].digest)){
-                        console.log('retrieve', new Date().getTime() - start_timer);
+                        console.log('retrieve_time', new Date().getTime() - start_timer);
                         res.status(500).send({'message':'Internal Server Error: Model data are corrupted.'});
                         return
                     }
@@ -552,21 +589,22 @@ app.get("/model", wrapAsync(async function(req, res, next){
                     checkpoints: recovered.checkpoints
                 }
                 
-                console.log('retrieve-VALID', new Date().getTime() - start_timer);
+                console.log('retrieve_time_valid', new Date().getTime() - start_timer); //includes the time needed to get the data from the blockchain
+                console.log('retrieve_preprocessing_time', new Date().getTime() - retrieve_preprocessing_time - sub);
                 res.status(200).send(ledger_entry);
             }else{
-                console.log('retrieve', new Date().getTime() - start_timer);
+                console.log('retrieve_time', new Date().getTime() - start_timer);
                 res.status(400).send({'message':'Bad Request Error: Ensure valid query parameters are provided.'});
             }
         }catch(e){
             console.log(e);
-            console.log('retrieve', new Date().getTime() - start_timer);
+            console.log('retrieve_time', new Date().getTime() - start_timer);
             res.status(404).send({'message':'Not Found: Model with id "' + req.query.id + '" does not exist.'});
             return
         }
 
     }else{
-        console.log('retrieve', new Date().getTime() - start_timer);
+        console.log('retrieve_time', new Date().getTime() - start_timer);
         res.status(400).send({'message':'Bad Request Error: Ensure query parameter "token" is provided.'});
         return
     }
@@ -577,14 +615,14 @@ app.get("/model", wrapAsync(async function(req, res, next){
 app.put('/model/submit', wrapAsync(async function (req, res, next){
     let start_timer = new Date().getTime();//milliseconds
     if (!req.body.hasOwnProperty('token')){
-        console.log('submit', new Date().getTime() - start_timer);
+        console.log('submit_time', new Date().getTime() - start_timer);
         res.status(400).send({'message':'Bad Request Error: Property "token" is missing from request body.'});
         return
     }
     
 
     if (!req.body.hasOwnProperty('data')){
-        console.log('submit', new Date().getTime() - start_timer);
+        console.log('submit_time', new Date().getTime() - start_timer);
         res.status(400).send({'message':'Bad Request Error: Property "data" is missing from request body.'});
         return
     }
@@ -592,7 +630,7 @@ app.put('/model/submit', wrapAsync(async function (req, res, next){
         || !req.body.data.hasOwnProperty('tag2') || !req.body.data.hasOwnProperty('serialization_encoding')
         || !req.body.data.hasOwnProperty('model') || !req.body.data.hasOwnProperty('weights')
         || !req.body.data.hasOwnProperty('initialization') || !req.body.data.hasOwnProperty('checkpoints')){
-            console.log('submit', new Date().getTime() - start_timer);
+            console.log('submit_time', new Date().getTime() - start_timer);
             res.status(400).send({'message':'Bad Request Error: Ensure all the required json properties are provided.'});
             return
     }
@@ -614,7 +652,7 @@ app.put('/model/submit', wrapAsync(async function (req, res, next){
 
     var all_pages = '';
 
-
+    console.log('uncompressed_data_size', Buffer.byteLength(JSON.stringify(Tx_Pages)));
     if (COMPRESSION_ALGO === 'compress-json'){
         all_pages = JSON.stringify(compressJSON.compress(Tx_Pages));
     }else if (COMPRESSION_ALGO === 'compressed-json'){
@@ -626,14 +664,15 @@ app.put('/model/submit', wrapAsync(async function (req, res, next){
     }else{
         all_pages = JSON.stringify(Tx_Pages);
     }
+    console.log('compressed_data_size', Buffer.byteLength(all_pages));
 
     var buf = Buffer.from(all_pages, 'utf8')
     if (CHUNK_SIZE === -1){
         var chunks = [all_pages];
-        console.log(chunks.length);
     }else{
         var chunks = chunker(buf, MAX_CHUNK_SIZE);
     }
+    console.log('page_number', chunks.length);// excludes the metadata entry
     var pages = [];
     for (let i = 0; i < chunks.length; i++){
         let Tx_Page = {
@@ -646,7 +685,7 @@ app.put('/model/submit', wrapAsync(async function (req, res, next){
         pages.push(Tx_Page);
     }
     Tx_Meta.page_number = pages.length;
-   
+    console.log('submit_preprocessing_time', new Date().getTime() - start_timer); //does not include the submission to the blockchain delay
     try {
         res.status(200).send({'message':'OK'});
         LAST = 'false';
@@ -662,7 +701,7 @@ app.put('/model/submit', wrapAsync(async function (req, res, next){
     }catch(e){
         console.log(e);
         submit_tx_map_meta.set(req.body.data.id, {is_completed: 'false', status: 'ERROR', pending: -1});
-        console.log('submit', new Date().getTime() - start_timer);
+        console.log('submit_time', new Date().getTime() - start_timer);
         res.status(500).send({'message':'Internal Server Error: Failed to submit model ' + req.body.data.id + '.'});
         return
     }
