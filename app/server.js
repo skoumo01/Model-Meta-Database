@@ -1,16 +1,30 @@
 'use strict';
 const express = require('express');
 const HashMap = require('hashmap');
-const compressJSON = require('compress-json');
-const chunker = require('buffer-chunks');
-const bodyParser = require('body-parser');
-const MD5 = require('crypto-js/md5');
+const cors = require('cors');
 const compression = require('compression');
+const Client = require('fabric-client');
+const { exit } = require('process');
+const bodyParser = require('body-parser');
+
+const compressJSON = require('compress-json');  // compress-json
+const cjson = require('compressed-json');       // compressed-json
+const jsonpack = require('jsonpack/main')       //jsonpack
+const { stringify, parse } = require('zipson'); //zipson
+
+const chunker = require('buffer-chunks');
+const MD5 = require('crypto-js/md5');
+
+
 var app = express();
 var submit_tx_map_meta = new HashMap();
 var submit_tx_map_delete = new HashMap();
 var submit_tx_map_cleanup = new HashMap();
-var cors = require('cors');
+
+
+var myArgs = process.argv.slice(2);
+const COMPRESSION_ALGO = myArgs[0];
+
 
 app.use(cors());
 app.use(compression());
@@ -18,8 +32,6 @@ app.use(bodyParser.json({limit: '1000mb', extended: true}));
 app.use(bodyParser.urlencoded({limit: '1000mb', extended: true}));
 
 //////////////////////////////////////////////BLOCKCHAIN CLIENT///////////////////////////////////////////////
-const Client = require('fabric-client');
-const { exit } = require('process');
 
 const ORG_NAME = 'org1';
 const USER_NAME = 'Admin';
@@ -27,16 +39,8 @@ const PEER_NAME = 'peer0.org1.example.com';
 const CHANNEL_NAME = 'mychannel';
 const CHAINCODE_ID = 'contract_models';
 const MAX_CHUNK_SIZE = 20971520; //20MB //16777216;//10MB //5242880;//5MB
-var TOKEN = '';
-var MODEL_ID = '';    
-var TAG1 = '';
-var TAG2 = '';
-var MIN_TIMESTAMP = '';
-var MAX_TIMESTAMP = '';
-var PAGE_SIZE = '';
-var BOOKMARK = '';
-var DELETE_PAGE_SIZE = 10;
-var DELETE_BOOKMARK = '';
+const DELETE_PAGE_SIZE = 10;
+const DELETE_BOOKMARK = '';
 var LAST = '';
 var START_TIMER = 0;
 
@@ -519,7 +523,20 @@ app.get("/model", wrapAsync(async function(req, res, next){
                     }
                     data += model[i].data;
                 }
-                let recovered = compressJSON.decompress(JSON.parse(data));
+                
+                var recovered = {};
+
+                if (COMPRESSION_ALGO === 'compress-json'){
+                    recovered = compressJSON.decompress(JSON.parse(data));
+                }else if (COMPRESSION_ALGO === 'compressed-json'){
+                    recovered = cjson.decompress.fromString(data);
+                }else if (COMPRESSION_ALGO === 'jsonpack'){
+                    recovered = jsonpack.unpack(JSON.parse(data));
+                }else if(COMPRESSION_ALGO === 'zipson'){
+                    recovered = parse(JSON.parse(data));
+                }else{
+                    recovered = JSON.parse(data);
+                }
 
                 let response = await getMeta(req.query.token, req.query.id);
                 let meta = JSON.parse(response);
@@ -594,7 +611,20 @@ app.put('/model/submit', wrapAsync(async function (req, res, next){
     Tx_Pages.initialization = req.body.data.initialization;
     Tx_Pages.checkpoints = req.body.data.checkpoints;
 
-    var all_pages = JSON.stringify(compressJSON.compress(Tx_Pages));
+    var all_pages = '';
+
+    if (COMPRESSION_ALGO === 'compress-json'){
+        all_pages = JSON.stringify(compressJSON.compress(Tx_Pages));
+    }else if (COMPRESSION_ALGO === 'compressed-json'){
+        all_pages = cjson.compress.toString(Tx_Pages);
+    }else if (COMPRESSION_ALGO === 'jsonpack'){
+        all_pages = JSON.stringify(jsonpack.pack(Tx_Pages));
+    }else if(COMPRESSION_ALGO === 'zipson'){
+        all_pages = JSON.stringify(stringify(Tx_Pages));
+    }else{
+        all_pages = JSON.stringify(Tx_Pages);
+    }
+
     var buf = Buffer.from(all_pages, 'utf8')
     var chunks = chunker(buf, MAX_CHUNK_SIZE);
     var pages = [];
@@ -976,7 +1006,6 @@ async function main() {
     channel = await setupChannel();
 
     
-    
     //start REST server
     var server = app.listen(3000, function () {
         var host = server.address().address
@@ -984,19 +1013,9 @@ async function main() {
         console.log("Example app listening at http://%s:%s", host, port)
     });
     
+
     return
-    
-    
-    
-    /*
-    LAST = 'true';
-    let result = await getDeleteKeys('token', 'id_0');
-    console.log(result);
-    //result = await getCleanUpKeys('token', 'id_0');
-    //console.log(result);
-    await deleteKeys(result, 'token', 'id_0');
-    */
-    
+
     var TxMeta = {};
     TxMeta.model_id = "id_0";
     TxMeta.tag1 = "tag1";
@@ -1004,15 +1023,28 @@ async function main() {
     TxMeta.serialization_encoding = "base64";
     
     
-    var TxPage = {};
-    TxPage.model_id = "id_0";
-    TxPage.page_id = 0;
-    TxPage.data = "data0";
-    TxPage.digest = "dummy digest 0";
-    TxPage.page_bytes = 5
+    var Tx_Pages = {};
+    Tx_Pages.model_id = "id_0";
+    Tx_Pages.page_id = 0;
+    Tx_Pages.data = "data0";
+    Tx_Pages.digest = "dummy digest 0";
+    Tx_Pages.page_bytes = 5
     
-    
-    var all_pages = JSON.stringify(compressJSON.compress(TxPage));
+    var all_pages = '';
+
+    if (COMPRESSION_ALGO === 'compress-json'){
+        all_pages = JSON.stringify(compressJSON.compress(Tx_Pages));
+    }else if (COMPRESSION_ALGO === 'compressed-json'){
+        all_pages = cjson.compress.toString(Tx_Pages);
+    }else if (COMPRESSION_ALGO === 'jsonpack'){
+        all_pages = JSON.stringify(jsonpack.pack(Tx_Pages));
+    }else if(COMPRESSION_ALGO === 'zipson'){
+        all_pages = JSON.stringify(stringify(Tx_Pages));
+    }else{
+        all_pages = JSON.stringify(Tx_Pages);
+    }
+
+
     var buf = Buffer.from(all_pages, 'utf8')
     let max_chunk_size = 50;
     var chunks = chunker(buf, max_chunk_size);
@@ -1030,18 +1062,19 @@ async function main() {
     
     TxMeta.page_number = pages.length;
     submit_tx_map_meta.set("id_0", {is_completed: 'false', status: 'PENDING', pending: pages.length+1});
-    await submitMeta(TxMeta, 'token', 'id_0');
+    //await submitMeta(TxMeta, 'token', 'id_0');
     
-    /*
+
     LAST = 'false';
     for (let i = 0; i < pages.length; i++){
         if (i == pages.length-1){
             LAST = 'true';
         }
-        await submitPage(pages[i], 'token', 'id_0');
+        //await submitPage(pages[i], 'token', 'id_0');
     }
 
-    */
+    //return
+    
     var model = {};
     let page_counter = 0;
     let book = '';
@@ -1060,8 +1093,23 @@ async function main() {
     for (let i = 0; i < page_counter; i++){
         data += model[i].data;
     }
-    let recovered = compressJSON.decompress(JSON.parse(data));
-    
+
+
+    var recovered = {};
+
+    if (COMPRESSION_ALGO === 'compress-json'){
+        recovered = compressJSON.decompress(JSON.parse(data));
+    }else if (COMPRESSION_ALGO === 'compressed-json'){
+        recovered = cjson.decompress.fromString(data);
+    }else if (COMPRESSION_ALGO === 'jsonpack'){
+        recovered = jsonpack.unpack(JSON.parse(data));
+    }else if(COMPRESSION_ALGO === 'zipson'){
+        recovered = parse(JSON.parse(data));
+    }else{
+        recovered = JSON.parse(data);
+    }
+
+
     let response = await getMeta('token', 'id_0');
     let meta = JSON.parse(response);
 
@@ -1074,13 +1122,9 @@ async function main() {
         initialization: recovered.initialization,
         checkpoints: recovered.checkpoints
     }
-    console.log(ledger_entry);
+    console.log(JSON.stringify(ledger_entry));
     
-
-    //await getMeta('token', 'id_0');
-    //await getTag1Meta("tag1", 3, '', 'token')
-    //await getTag2Meta("tag2", 3, '', 'token')
-    //await getTag12Meta("tag1", "tag2", 3, '', 'token')
+    
 
 }
 
