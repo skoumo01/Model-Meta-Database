@@ -666,6 +666,7 @@ app.put('/model/submit', wrapAsync(async function (req, res, next){
     }
     console.log('compressed_data_size', Buffer.byteLength(all_pages));
 
+    
     var buf = Buffer.from(all_pages, 'utf8')
     if (CHUNK_SIZE === -1){
         var chunks = [all_pages];

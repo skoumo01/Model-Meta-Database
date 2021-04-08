@@ -2,8 +2,8 @@ const http = require('http')
 const fs = require('fs')
 
 var myArgs = process.argv.slice(2);
-const MODEL = myArgs[0]; //darknet | pytorch | tfv2 | tfjs | tflite
-
+const MODEL = myArgs[1]; //darknet | pytorch | tfv2 | tfjs | tflite
+const RUN = myArgs[0]; // submit | retrieve
 
 function darknet(){
 	let architecture = fs.readFileSync('./data/experiments/darknet/yolov3.cfg', {encoding: 'base64'});
@@ -402,7 +402,7 @@ function retrieve(model_id){
 		console.log(`statusCode: ${res.statusCode}`)
 	  
 		res.on('data', d => {
-		  process.stdout.write(d)
+		  //process.stdout.write(d)
 		})
 	  })
 	  
@@ -414,8 +414,11 @@ function retrieve(model_id){
 
 }
 
-//submit(MODEL)
-//retrieve(MODEL);
+if (RUN === 'submit'){
+	submit(MODEL);
+}else{
+	retrieve(MODEL);
+}
 
 
-//node experiments.js darknet
+//node experiments.js submit darknet
