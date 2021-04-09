@@ -4,6 +4,8 @@ const fs = require('fs')
 var myArgs = process.argv.slice(2);
 const MODEL = myArgs[1]; //darknet | pytorch | tfv2 | tfjs | tflite
 const RUN = myArgs[0]; // submit | retrieve
+const TEST = myArgs[2]; // true | false
+const TEST_MODEL_SIZE = parseInt(myArgs[3]) * 1024 * 1024; //MB
 
 function darknet(){
 	let architecture = fs.readFileSync('./data/experiments/darknet/yolov3.cfg', {encoding: 'base64'});
@@ -347,10 +349,41 @@ function tflite(){
 	return data;
 }
 
+function test_model(size){
+	var test_data = Buffer.allocUnsafe(size).fill('s').toString('utf8');
+	
+
+	let data = JSON.stringify({
+		"token": "token",
+		"data": {
+			"id": "test"+(size/(1024*1024)),
+			"tag1":"tag1",
+			"tag2":"tag2",
+			"serialization_encoding":"utf8",
+			"model": [
+				{
+					"metadata":
+					{
+						"identifier":"test",
+						"original_format":"test"
+					},
+					"serialized_data": test_data
+				}
+			],
+			"weights":[ ],
+			"initialization":[ ],
+			"checkpoints":[ ]
+		}
+	})
+	
+	return data;
+}
 
 function submit(model_id){
 	
-	if (model_id === 'darknet'){
+	if (TEST === 'true'){
+		var data = test_model(TEST_MODEL_SIZE);
+	}else if (model_id === 'darknet'){
 		var data = darknet();
 	}else if (model_id === 'pytorch'){
 		var data = pytorch();
@@ -421,4 +454,4 @@ if (RUN === 'submit'){
 }
 
 
-//node experiments.js submit darknet
+//node experiments.js submit test100 true 100
