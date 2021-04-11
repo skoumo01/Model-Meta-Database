@@ -11,94 +11,20 @@ info:
 host: "10.16.30.89:3000"
 basePath: "/"
 tags:
-- name: "submit"
-  description: "Submit models"
-- name: "check"
-  description: "Check submission transaction status"
-- name: "latest"
-  description: "Query latest version"
+- name: "model"
+  description: "Create/Update/Delete/Cleanup a single model"
+- name: "metadata"
+  description: "Query model metadata"
 schemes:
 - "http"
 paths:
-  /submit:
-    put:
-      tags:
-      - "submit"
-      schemes:
-      - "http"
-      summary: "Create or update a model"
-      description: "Creates a new version of model with the specified id. If the model does not exist, it creates it."
-      operationId: "submitModel"
-      consumes:
-      - "application/json"
-      parameters:
-      - in: "body"
-        name: "body"
-        description: "The model data to be submitted."
-        required: true
-        schema:
-          $ref: "#/definitions/Submission"
-      responses:
-        "200":
-          description: "Successfully submitted transaction to blockchain. This does not guarantee that the model has been committed on the blockchain; the transaction has just been successfully send for evaluation by the blockchain network. Returns no error if the provided token is invalid; must use the /check endpoint to find out about the result of the submission transaction."
-          schema:
-            $ref: "#/definitions/OkResponse"
-        "400":
-          description: "Bad Request; one or more of the required json properties have not been provided."
-          schema:
-            $ref: "#/definitions/BadRequestResponse"
-        "500":
-          description: "Internal Server Error."
-          schema:
-            $ref: "#/definitions/InternalServerResponse"
-  /check:
+  /model:
     get:
       tags:
-      - "check"
-      summary: "Check the status of the latest model submission transaction"
-      description: "Returns a submission transaction status"
-      operationId: "checkSubmit"
-      produces:
-      - "application/json"
-      parameters:
-      - name: "token"
-        in: "query"
-        description: "The client's blockchain authentication/authorization token."
-        required: true
-        type: "string"
-      - name: "id"
-        in: "query"
-        description: "The model's ID. e.g. 'id_0'"
-        required: true
-        type: "string"
-      responses:
-        "200":
-          description: "Successful Operation."
-          schema:
-            $ref: "#/definitions/Status"
-        "400":
-          description: "Bad Request; one or more of the required properties have not been provided."
-          schema:
-            $ref: "#/definitions/BadRequestResponse"
-        "401":
-          description: "Unauthorized action. The provided client token was checked and deemed invalid."
-          schema:
-            $ref: "#/definitions/AuthorizationErrorResponse"
-        "404":
-          description: "Model not found. This means that there was no previous attempt to submit a model with this specific ID."
-          schema:
-            $ref: "#/definitions/NotFoundResponse"
-        "500":
-          description: "Internal Server Error."
-          schema:
-            $ref: "#/definitions/InternalServerResponse"
-  /latest/model:
-    get:
-      tags:
-      - "latest"
-      summary: "Query the latest version of a model"
+      - "model"
+      summary: "Retrieve a model"
       description: ""
-      operationId: "latestModelVersion"
+      operationId: "model"
       produces:
       - "application/json"
       parameters:
@@ -118,7 +44,7 @@ paths:
           schema:
             $ref: "#/definitions/Data"
         "400":
-          description: "Bad Request; one or more of the required properties have not been provided."
+          description: "Bad Request; one or more of the required properties/parameters have not been provided."
           schema:
             $ref: "#/definitions/BadRequestResponse"
         "401":
@@ -133,10 +59,246 @@ paths:
           description: "Internal Server Error."
           schema:
             $ref: "#/definitions/InternalServerResponse"
-  /latest/metadata:
+  /model/submit:
+    put:
+      tags:
+      - "model"
+      schemes:
+      - "http"
+      summary: "Create or update a model"
+      description: "Overwrites the model with the provided ID on the blockchain. If the model does not already exist, it creates a new one."
+      operationId: "model_submit"
+      consumes:
+      - "application/json"
+      parameters:
+      - in: "body"
+        name: "body"
+        description: "The model data to be submitted."
+        required: true
+        schema:
+          $ref: "#/definitions/Submission"
+      responses:
+        "200":
+          description: "Successfully submitted transaction to blockchain. This does not guarantee that the model has been committed on the blockchain; the transaction has just been successfully send for evaluation by the blockchain network. Returns no error if the provided token is invalid; must use the model/submit/check endpoint to find out about the result of the submission transaction."
+          schema:
+            $ref: "#/definitions/OkResponse"
+        "400":
+          description: "Bad Request; one or more of the required json properties/parameters have not been provided."
+          schema:
+            $ref: "#/definitions/BadRequestResponse"
+        "500":
+          description: "Internal Server Error."
+          schema:
+            $ref: "#/definitions/InternalServerResponse"
+  /model/submit/check:
     get:
       tags:
-      - "latest"
+      - "model"
+      summary: "Check the status of a model submission transaction"
+      description: "Returns a submission transaction status"
+      operationId: "model_submit_check"
+      produces:
+      - "application/json"
+      parameters:
+      - name: "token"
+        in: "query"
+        description: "The client's blockchain authentication/authorization token."
+        required: true
+        type: "string"
+      - name: "id"
+        in: "query"
+        description: "The model's ID. e.g. 'id_0'"
+        required: true
+        type: "string"
+      responses:
+        "200":
+          description: "Successful Operation."
+          schema:
+            $ref: "#/definitions/Status"
+        "400":
+          description: "Bad Request; one or more of the required properties/parameters have not been provided."
+          schema:
+            $ref: "#/definitions/BadRequestResponse"
+        "401":
+          description: "Unauthorized action. The provided client token was checked and deemed invalid."
+          schema:
+            $ref: "#/definitions/AuthorizationErrorResponse"
+        "404":
+          description: "Model not found. This means that there was no previous attempt to submit a model with this specific ID."
+          schema:
+            $ref: "#/definitions/NotFoundResponse"
+        "500":
+          description: "Internal Server Error."
+          schema:
+            $ref: "#/definitions/InternalServerResponse"
+  /model/delete:
+    get:
+      tags:
+      - "model"
+      summary: "Delete a model"
+      description: "Issues multiple delete transactions to remove a model form the World State. If a model has shrunk in size over time (i.e. submission N+i had less model data than submission N, i>0), it is possible that data belonging to the old model are still left on the blockchain, but cannot be accessed via the data retrieving endpoints; use the model/cleanup endpoint to remove such data. Additionally, this endpoint does not implement transaction logic; if a delete transaction fails and others succeed, the World State is left in a corrupted state. A corrupted state only affects model retrieval; use the model/cleanup endpoint to remove the corrupted data, or submit a new model with the same ID to the blockchain (i.e. overwrite)."
+      operationId: "model_delete"
+      produces:
+      - "application/json"
+      parameters:
+      - name: "token"
+        in: "query"
+        description: "The client's blockchain authentication/authorization token."
+        required: true
+        type: "string"
+      - name: "id"
+        in: "query"
+        description: "The model's ID. e.g. 'id_0'"
+        required: true
+        type: "string"
+      responses:
+        "200":
+          description: "Successfully submitted the necessary delete transactions to blockchain. This does not guarantee that the model has been deleted from the blockchain; the transactions have just been successfully send for evaluation by the blockchain network.Use the model/delete/check endpoint to find out about the result of the delete transaction."
+          schema:
+            $ref: "#/definitions/OkResponse"
+        "400":
+          description: "Bad Request; one or more of the required properties/parameters have not been provided."
+          schema:
+            $ref: "#/definitions/BadRequestResponse"
+        "401":
+          description: "Unauthorized action. The provided client token was checked and deemed invalid."
+          schema:
+            $ref: "#/definitions/AuthorizationErrorResponse"
+        "404":
+          description: "Model not found."
+          schema:
+            $ref: "#/definitions/NotFoundResponse"
+        "500":
+          description: "Internal Server Error."
+          schema:
+            $ref: "#/definitions/InternalServerResponse"
+  /model/delete/check:
+    get:
+      tags:
+      - "model"
+      summary: "Check the status of a model delete transaction"
+      description: "Returns a delete transaction's status"
+      operationId: "model_delete_check"
+      produces:
+      - "application/json"
+      parameters:
+      - name: "token"
+        in: "query"
+        description: "The client's blockchain authentication/authorization token."
+        required: true
+        type: "string"
+      - name: "id"
+        in: "query"
+        description: "The model's ID. e.g. 'id_0'"
+        required: true
+        type: "string"
+      responses:
+        "200":
+          description: "Successful Operation."
+          schema:
+            $ref: "#/definitions/Status"
+        "400":
+          description: "Bad Request; one or more of the required properties/parameters have not been provided."
+          schema:
+            $ref: "#/definitions/BadRequestResponse"
+        "401":
+          description: "Unauthorized action. The provided client token was checked and deemed invalid."
+          schema:
+            $ref: "#/definitions/AuthorizationErrorResponse"
+        "404":
+          description: "No delete attempt for the requested model has been issued."
+          schema:
+            $ref: "#/definitions/NotFoundResponse"
+        "500":
+          description: "Internal Server Error."
+          schema:
+            $ref: "#/definitions/InternalServerResponse"
+  /model/cleanup:
+    get:
+      tags:
+      - "model"
+      summary: "Clean up a model"
+      description: "Removes unreachable data from the blockchain for a specific model ID."
+      operationId: "model_cleanup"
+      produces:
+      - "application/json"
+      parameters:
+      - name: "token"
+        in: "query"
+        description: "The client's blockchain authentication/authorization token."
+        required: true
+        type: "string"
+      - name: "id"
+        in: "query"
+        description: "The model's ID. e.g. 'id_0'"
+        required: true
+        type: "string"
+      responses:
+        "200":
+          description: "Successfully submitted the necessary delete transactions to blockchain. This does not guarantee that the model has been successfully cleaned up; the transactions have just been successfully send for evaluation by the blockchain network. Use the model/cleanup/check endpoint to find out about the result of the delete transaction. If that endpoint fails, simply continue issuing requests to this endpoint until the model gets cleaned up."
+          schema:
+            $ref: "#/definitions/OkResponse"
+        "400":
+          description: "Bad Request; one or more of the required properties/parameters have not been provided."
+          schema:
+            $ref: "#/definitions/BadRequestResponse"
+        "401":
+          description: "Unauthorized action. The provided client token was checked and deemed invalid."
+          schema:
+            $ref: "#/definitions/AuthorizationErrorResponse"
+        "404":
+          description: "Model not found."
+          schema:
+            $ref: "#/definitions/NotFoundResponse"
+        "500":
+          description: "Internal Server Error."
+          schema:
+            $ref: "#/definitions/InternalServerResponse"
+  /model/cleanup/check:
+    get:
+      tags:
+      - "model"
+      summary: "Check the status of a model cleanup transaction"
+      description: "Returns a cleanup transaction's status"
+      operationId: "model_cleanup_check"
+      produces:
+      - "application/json"
+      parameters:
+      - name: "token"
+        in: "query"
+        description: "The client's blockchain authentication/authorization token."
+        required: true
+        type: "string"
+      - name: "id"
+        in: "query"
+        description: "The model's ID. e.g. 'id_0'"
+        required: true
+        type: "string"
+      responses:
+        "200":
+          description: "Successful Operation."
+          schema:
+            $ref: "#/definitions/Status"
+        "400":
+          description: "Bad Request; one or more of the required properties/parameters have not been provided."
+          schema:
+            $ref: "#/definitions/BadRequestResponse"
+        "401":
+          description: "Unauthorized action. The provided client token was checked and deemed invalid."
+          schema:
+            $ref: "#/definitions/AuthorizationErrorResponse"
+        "404":
+          description: "No cleanup attempt for the requested model has been issued."
+          schema:
+            $ref: "#/definitions/NotFoundResponse"
+        "500":
+          description: "Internal Server Error."
+          schema:
+            $ref: "#/definitions/InternalServerResponse"
+  /metadata:
+    get:
+      tags:
+      - "metadata"
       summary: "Query the metadata of a specific model"
       description: ""
       operationId: "latestModelMetadata"
@@ -174,10 +336,10 @@ paths:
           description: "Internal Server Error."
           schema:
             $ref: "#/definitions/InternalServerResponse"
-  /latest/tags:
+  /metadata/tags:
     get:
       tags:
-      - "latest"
+      - "metadata"
       summary: "Query the metadata of the models with these 2 tags"
       description: ""
       operationId: "tagsQuery"
@@ -226,10 +388,10 @@ paths:
           description: "Internal Server Error: Failed to execute tag query."
           schema:
             $ref: "#/definitions/InternalServerResponse"
-  /latest/tags/tag1:
+  /metadata/tags/tag1:
     get:
       tags:
-      - "latest"
+      - "metadata"
       summary: "Query the metadata of the models with a specific tag1"
       description: ""
       operationId: "tag1Query"
@@ -273,10 +435,10 @@ paths:
           description: "Internal Server Error: Failed to execute tag query."
           schema:
             $ref: "#/definitions/InternalServerResponse"
-  /latest/tags/tag2:
+  /metadata/tags/tag2:
     get:
       tags:
-      - "latest"
+      - "metadata"
       summary: "Query the metadata of the models with a specific tag2"
       description: ""
       operationId: "tag2Query"
@@ -349,14 +511,14 @@ definitions:
       message:
         type: "string"
     example:
-      message: "Bad Request Error: Ensure all the required properties are provided."
+      message: "Bad Request Error."
   NotFoundResponse:
     type: "object"
     properties:
       message:
         type: "string"
     example:
-      message: "Not Found: Model with id 'id_4' does not exist."
+      message: "Not Found."
   InternalServerResponse:
     type: "object"
     properties:
@@ -370,7 +532,7 @@ definitions:
       message:
         type: "string"
     example:
-      message: "Unauthorized: authorization not granded: token 'token' is invalid."
+      message: "Unauthorized."
   Status:
     type: "object"
     properties:
@@ -387,7 +549,8 @@ definitions:
         description: >
           status order:
            * `VALID` - The model has been successfully been committed to the blockchain.
-           * `INVALID` - Blockchain peers rejected the transaction even though client token was valid.
+           * `CORRUPTED` - Blockchain peers rejected the delete transaction even though client token was valid. The World State database is in a corrupted state, because the delete operation was unsuccessful.
+           * `FAILED` - Clean up operation was unsuccessful.
            * `PENDING` - Transaction still in progress.
            * `ERROR` - Internal Server Error failure.
            * `UNAUTHORIZED` - The provided token was invalid; unauthorized client.
@@ -401,13 +564,7 @@ definitions:
         type: "array"
         items:
           type: "object"
-          properties:
-            Key:
-              type: "string"
-              example: "id_0"
-            Value:
-              type: "object"
-              $ref: "#/definitions/Metadata"
+          $ref: "#/definitions/Metadata"
       fetchedRecordsCount:
         type: "integer"
         example: 3

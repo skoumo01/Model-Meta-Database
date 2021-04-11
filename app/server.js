@@ -611,7 +611,6 @@ app.get("/model", wrapAsync(async function(req, res, next){
 
 }));
 
-
 app.put('/model/submit', wrapAsync(async function (req, res, next){
     let start_timer = new Date().getTime();//milliseconds
     if (!req.body.hasOwnProperty('token')){
@@ -818,7 +817,11 @@ app.get("/model/cleanup", wrapAsync(async function(req, res, next){
         try {
             if (req.query.hasOwnProperty('id')){
                 let response = await getCleanUpKeys(req.query.token, req.query.id);
-                console.log(response);
+                if (response.length === 0){
+                    submit_tx_map_cleanup.set(req.query.id, {is_completed: 'true', status: 'VALID'});
+                    res.status(200).send({'message': 'OK'});
+                    return;
+                }
                 if (response.includes('does not exist')){
                     submit_tx_map_cleanup.set(req.query.id, {is_completed: 'true', status: 'ERROR'});
                     res.status(404).send({'message':'Not Found: Model with id "' + req.query.id + '" does not exist.'});
@@ -838,6 +841,7 @@ app.get("/model/cleanup", wrapAsync(async function(req, res, next){
             }
         }catch(e){
             submit_tx_map_cleanup.set(req.query.id, {is_completed: 'true', status: 'ERROR'});
+            console.log(e);
             res.status(404).send({'message':'Not Found: Model with id "' + req.query.id + '" does not exist.'});
             return
         }
