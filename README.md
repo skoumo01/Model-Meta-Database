@@ -17,34 +17,41 @@ The following diagram depicts the different components of the meta-database:
 $ sudo apt install git
 ```
 
+
 #### Install cURL
 ```
 $ sudo apt install curl
 ```
+
 
 #### Install wget
 ```
 $ sudo apt install wget
 ```
 
+
 #### Install Docker
 ```
 $ sudo apt install docker.io
 ```
+
 Verify that the docker daemon is running:
 ```
 $ sudo systemctl start docker
 ```
-Make the docker daemon to start when the system starts:
+
+Make the docker daemon start when the system starts:
 ```
 $ sudo systemctl enable docker
 ```
+
 
 #### Install Docker Compose
 ```
 $ sudo curl -L "https://github.com/docker/compose/releases/download/1.26.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 $ sudo chmod +x /usr/local/bin/docker-compose
 ```
+
 
 #### Install Go
 ```
@@ -57,17 +64,20 @@ $ export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
 ```
 The above environment will be set for your current session only; alternatively add the above commands in \~/.profile (\~/.bashrc) file.
 
+
 #### Install Node.js
 ```
 $ curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
 $ nvm install 10.23.0
 $ nvm install 12.19.0
 ```
+
 Select to use Node.js version 10.23.0:
 ```
 $ nvm use 10.23.0
 ```
 Node.js version 12.19.0 will be used later on to start the REST server.
+
 
 #### Install NPM
 Installing Node.js will also install NPM, however it is recommended that you verify so:
@@ -75,31 +85,56 @@ Installing Node.js will also install NPM, however it is recommended that you ver
 $ npm --version
 ```
 
+
 #### Install Hyperledger Fabric Binaries and Docker Images
 ```
 $ curl -sSL https://bit.ly/2ysbOFE | bash -s
 ```
-The above command retrieves the [fabric-samples](https://github.com/hyperledger/fabric-samples) repository. This repository contains some binary files that need to be added to your PATH environment variable:
+
+The above command clones the [fabric-samples](https://github.com/hyperledger/fabric-samples) repository. This repository contains some binary files that need to be added to your PATH environment variable:
 ```
 $ export PATH=<path to download location>/fabric-samples/bin:$PATH
 ```
 The above environment will be set for your current session only; alternatively add the above commands in \~/.profile (\~/.bashrc) file.
 
+
 #### Clone the project's repository
 ```
 $ git clone https://github.com/skoumo01/Model-Meta-Database.git
 ```
-The repository should be cloned in the same directory as the ***fabric-samples*** repository.
+The repository should be cloned in the same directory as the **fabric-samples** repository.
+
 
 #### Bring up the network and chaincode Docker containers
-Execute the follwing from the project's ***network/*** directory:
+Execute the following from the project's **network/** directory:
 ```
 $ ./network.sh up -c mychannel -db couchdb
 $ ./network.sh deployCC -c mychannel -ccn contract_models -ccv 1 -ccp ../chaincode/src/models/ -ccl golang
 ```
 
+
 ### 2) Set-up Layer 1
-#### 
+#### Bring up the REST server
+Execute the following from the project's **app/** directory:
+```
+$ nvm use 12.19.0
+$ npm install
+$ rm -rf credstore/
+$ node cred-store.js org1 Admin
+$ node --max-old-space-size=4096 server.js none 10 false
+```
+The last command can be adapted to suit the user's requirements as follows:
+- **max-old-space-size** sets the server's max heap size (in bytes).
+- The server (optionally) uses data compression to reduce tha volume of the data sent to Layer 2. **none** refers to the data compression module to be used by the server.
+  The options are:
+  - none
+  - [compress-json](https://www.npmjs.com/package/compress-json)
+  - [compressed-json](https://www.npmjs.com/package/compressed-json)
+  - [jsonpack](https://www.npmjs.com/package/jsonpack)
+  - [zipson](https://www.npmjs.com/package/zipson)
+  It is recommended to use *none*; experiments have shown that *none* results into better overall performance.
+- The server uses paging in order to be able to handle big data volumes more efficiently (e.g. using multiplexing; not yet implemented). **10** refers to the page size to be used by the server (in megabytes).
+- **false** deactivates some console prints that can be used for debugging. Set to *true* to activate the debugging prints.
 
 
 ## Acknowledgements
