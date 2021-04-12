@@ -90,7 +90,6 @@ $ npm --version
 ```
 $ curl -sSL https://bit.ly/2ysbOFE | bash -s
 ```
-
 The above command clones the [fabric-samples](https://github.com/hyperledger/fabric-samples) repository. This repository contains some binary files that need to be added to your PATH environment variable:
 ```
 $ export PATH=<path to download location>/fabric-samples/bin:$PATH
@@ -126,13 +125,13 @@ $ node --max-old-space-size=4096 server.js none 10 false
 The last command can be adapted to suit the user's requirements as follows:
 - **max-old-space-size** sets the server's max heap size (in bytes).
 - The server (optionally) uses data compression to reduce tha volume of the data sent to Layer 2. **none** refers to the data compression module to be used by the server.
+  (It is recommended to use *none*; experiments have shown that *none* results into better overall performance.)
   The options are:
   - none
   - [compress-json](https://www.npmjs.com/package/compress-json)
   - [compressed-json](https://www.npmjs.com/package/compressed-json)
   - [jsonpack](https://www.npmjs.com/package/jsonpack)
   - [zipson](https://www.npmjs.com/package/zipson)
-  It is recommended to use *none*; experiments have shown that *none* results into better overall performance.
 - The server uses paging in order to be able to handle big data volumes more efficiently (e.g. using multiplexing; not yet implemented). **10** refers to the page size to be used by the server (in megabytes).
 - **false** deactivates some console prints that can be used for debugging. Set to *true* to activate the debugging prints.
 
