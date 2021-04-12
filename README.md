@@ -9,7 +9,8 @@ The following diagram depicts the different components of the meta-database:
 ![model-meta-database-architecture](https://i.imgur.com/duoaoEs.png)
 
 
-## Setting up the database
+
+## Getting Started
 ### 1) Set-up Layer 2:
 #### Install Git
 ```
@@ -84,7 +85,22 @@ $ export PATH=<path to download location>/fabric-samples/bin:$PATH
 ```
 The above environment will be set for your current session only; alternatively add the above commands in \~/.profile (\~/.bashrc) file.
 
+#### Clone the project's repository
+```
+$ git clone https://github.com/skoumo01/Model-Meta-Database.git
+```
+The repository should be cloned in the same directory as the ***fabric-samples*** repository.
+
+#### Bring up the network and chaincode Docker containers
+Execute the follwing from the project's ***network/*** directory:
+```
+$ ./network.sh up -c mychannel -db couchdb
+$ ./network.sh deployCC -c mychannel -ccn contract_models -ccv 1 -ccp ../chaincode/src/models/ -ccl golang
+```
+
 ### 2) Set-up Layer 1
+#### 
+
 
 ## Acknowledgements
 To set-up the blockchain layer (i.e. Layer 2) follow the instructions on  GitHub repository. Many thanks to my colleage for allowing me to use and build upon his [project](https://github.com/Erodotos/Hyperledger-Fabric-Network).
