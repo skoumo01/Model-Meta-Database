@@ -139,3 +139,5 @@ The last command can be adapted to suit the user's requirements as follows:
 ## Acknowledgements
 To set-up the blockchain layer (i.e. Layer 2) follow the instructions on  GitHub repository. Many thanks to my colleage for allowing me to use and build upon his [project](https://github.com/Erodotos/Hyperledger-Fabric-Network).
 
+## Contact
+For more information about the project, check out the corresponding webpage [here](https://www.cs.ucy.ac.cy/projects/blockdb/index.html)
