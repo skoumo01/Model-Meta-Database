@@ -9,6 +9,83 @@ The following diagram depicts the different components of the meta-database:
 ![model-meta-database-architecture](https://i.imgur.com/duoaoEs.png)
 
 
-#### Important:
-To set-up the blockchain layer (i.e. Layer 2) follow the instructions on [this](https://github.com/Erodotos/Hyperledger-Fabric-Network) GitHub repository; only some minor adaptations will be necessary. Many thanks to my colleage for allowing me to use and build upon his our project.
-Further set-up and usage instructions will be provided later on in the future.
+## Setting up the database
+### 1) Set-up Layer 2:
+#### Install Git
+```
+$ sudo apt install git
+```
+
+#### Install cURL
+```
+$ sudo apt install curl
+```
+
+#### Install wget
+```
+$ sudo apt install wget
+```
+
+#### Install Docker
+```
+$ sudo apt install docker.io
+```
+Verify that the docker daemon is running:
+```
+$ sudo systemctl start docker
+```
+Make the docker daemon to start when the system starts:
+```
+$ sudo systemctl enable docker
+```
+
+#### Install Docker Compose
+```
+$ sudo curl -L "https://github.com/docker/compose/releases/download/1.26.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+$ sudo chmod +x /usr/local/bin/docker-compose
+```
+
+#### Install Go
+```
+$ wget https://dl.google.com/go/go1.13.8.linux-amd64.tar.gz
+$ sudo tar -xvf go1.13.8.linux-amd64.tar.gz
+$ sudo mv go /usr/local
+$ export GOROOT=/usr/local/go
+$ export GOPATH=$HOME/go
+$ export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
+```
+The above environment will be set for your current session only; alternatively add the above commands in \~/.profile (\~/.bashrc) file.
+
+#### Install Node.js
+```
+$ curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
+$ nvm install 10.23.0
+$ nvm install 12.19.0
+```
+Select to use Node.js version 10.23.0:
+```
+$ nvm use 10.23.0
+```
+Node.js version 12.19.0 will be used later on to start the REST server.
+
+#### Install NPM
+Installing Node.js will also install NPM, however it is recommended that you verify so:
+```
+$ npm --version
+```
+
+#### Install Hyperledger Fabric Binaries and Docker Images
+```
+$ curl -sSL https://bit.ly/2ysbOFE | bash -s
+```
+The above command retrieves the [fabric-samples](https://github.com/hyperledger/fabric-samples) repository. This repository contains some binary files that need to be added to your PATH environment variable:
+```
+$ export PATH=<path to download location>/fabric-samples/bin:$PATH
+```
+The above environment will be set for your current session only; alternatively add the above commands in \~/.profile (\~/.bashrc) file.
+
+### 2) Set-up Layer 1
+
+## Acknowledgements
+To set-up the blockchain layer (i.e. Layer 2) follow the instructions on  GitHub repository. Many thanks to my colleage for allowing me to use and build upon his [project](https://github.com/Erodotos/Hyperledger-Fabric-Network).
+
