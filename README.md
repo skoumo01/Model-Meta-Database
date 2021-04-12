@@ -141,3 +141,6 @@ To set-up the blockchain layer (i.e. Layer 2) follow the instructions on  GitHub
 
 ## Contact
 For more information about the project, check out the corresponding webpage [here](https://www.cs.ucy.ac.cy/projects/blockdb/index.html)
+
+
+***Important:*** For the project to run successfully, the IP addresses in the configuration files must be adapted accordingly. To run both the blockchain network and the server on the same machine, simply change all IP addresses to *localhost*.
