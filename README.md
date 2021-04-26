@@ -6,7 +6,7 @@ The meta-database consists of mainly two layers: a NodeJS RESTful service layer 
 
 The following diagram depicts the different components of the meta-database:
 
-![model-meta-database-architecture](https://imgur.com/a/fhVQXNi)
+![model-meta-database-architecture](https://imgur.com/gallery/fhVQXNi)
 
 
 
