@@ -6,7 +6,7 @@ The meta-database consists of mainly two layers: a NodeJS RESTful service layer 
 
 The following diagram depicts the different components of the meta-database:
 
-<blockquote class="imgur-embed-pub" lang="en" data-id="a/fhVQXNi"  ><a href="//imgur.com/a/fhVQXNi">Model Meta-Database Architecture</a></blockquote><script async src="//s.imgur.com/min/embed.js" charset="utf-8"></script>
+![model-meta-database-architecture](https://i.imgur.com/GMZBIJG.png)
 
 
 
