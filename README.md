@@ -120,7 +120,7 @@ $ nvm use 12.19.0
 $ npm install
 $ rm -rf credstore/
 $ node cred-store.js org1 Admin
-$ node --max-old-space-size=4096 server.js none 10 false
+$ node --max-old-space-size=4096 server.js none 10 false true 10
 ```
 The last command can be adapted to suit the user's requirements as follows:
 - **max-old-space-size** sets the server's max heap size (in bytes).
@@ -134,6 +134,8 @@ The last command can be adapted to suit the user's requirements as follows:
   - [zipson](https://www.npmjs.com/package/zipson)
 - The server uses paging in order to be able to handle big data volumes more efficiently (e.g. using multiplexing; not yet implemented). **10** refers to the page size to be used by the server (in megabytes).
 - **false** deactivates some console prints that can be used for debugging. Set to *true* to activate the debugging prints.
+- **true** prints the average model submission latency of the _N_ first model submission requests received.
+- **10** the number of _N_
 
 
 ## Acknowledgements
