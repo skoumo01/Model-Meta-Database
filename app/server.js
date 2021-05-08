@@ -27,7 +27,12 @@ var myArgs = process.argv.slice(2);
 const COMPRESSION_ALGO = myArgs[0]; //compress-json | compressed-json | jsonpack | zipson
 const CHUNK_SIZE = parseInt(myArgs[1]);
 const MAX_CHUNK_SIZE = CHUNK_SIZE* 1024 * 1024; //MB -> bytes
-const DEBUG  = myArgs[2];
+const DEBUG  = myArgs[2]; // true | false
+const AVG = myArgs[3]; //true | false
+const AVG_COUNT = parseInt(myArgs[4]);
+var AVG_COUNTER = AVG_COUNT;
+var AVG_SUBMIT_LATENCY = 0;
+var AVG_SUBMIT_PROCESSING_TIME = 0;
 
 app.use(cors());
 app.use(compression());
@@ -44,7 +49,7 @@ const CHAINCODE_ID = 'contract_models';
 const DELETE_PAGE_SIZE = 10;
 const DELETE_BOOKMARK = '';
 var LAST = '';
-var START_TIMER = 0;
+//var START_TIMER = 0;
 
 
 // Constants for profile
@@ -113,7 +118,7 @@ async function submitMeta(tx_data, token, model_id) {
             console.log("#2 Looped through the proposal responses all_good=", all_good)
         }
 
-        await setupTxListener(tx_id_string, 'meta', model_id)//commented out for debugging
+        await setupTxListener(tx_id_string, 'meta', model_id, new Date().getTime())//commented out for debugging
         if (DEBUG === 'true'){
             console.log('#3 Registered the Tx Listener')
         }
@@ -137,7 +142,7 @@ async function submitMeta(tx_data, token, model_id) {
 
 }
 
-async function submitPage(tx_data,  token, model_id) {
+async function submitPage(tx_data,  token, model_id, start_timer) {
 
     let peerName = channel.getChannelPeer(PEER_NAME)
 
@@ -183,7 +188,7 @@ async function submitPage(tx_data,  token, model_id) {
             console.log("#2 Looped through the proposal responses all_good=", all_good)
         }
 
-        await setupTxListener(tx_id_string, 'page', model_id)//commented out for debugging
+        await setupTxListener(tx_id_string, 'page', model_id, start_timer)//commented out for debugging
         if (DEBUG === 'true'){
             console.log('#3 Registered the Tx Listener')
         }
@@ -325,7 +330,7 @@ async function deleteKeys(keys, token, model_id, type) {
             console.log("#2 Looped through the proposal responses all_good=", all_good)
         }
 
-        await setupTxListener(tx_id_string, type, model_id)
+        await setupTxListener(tx_id_string, type, model_id, new Date().getTime())
         if (DEBUG === 'true'){
             console.log('#3 Registered the Tx Listener')
         }
@@ -411,8 +416,8 @@ async function checkToken(token) {
     return response.toString();
 }
 
-async function setupTxListener(tx_id_string, type, model_id) {
-
+async function setupTxListener(tx_id_string, type, model_id, start_timer) {
+    
     try{
         let event_hub = channel.getChannelEventHub(PEER_NAME);
 
@@ -430,7 +435,7 @@ async function setupTxListener(tx_id_string, type, model_id) {
                 }else if (type == "cleanup"){
                         submit_tx_map_cleanup.set(model_id, {is_completed: 'true', status: 'FAILED'});
                 }else{
-                    console.log('submit-INVALID', new Date().getTime() - START_TIMER);// the time it took before the corruption was detected
+                    console.log('submit-INVALID', new Date().getTime() - start_timer);// the time it took before the corruption was detected
                     submit_tx_map_meta.set(model_id, {is_completed: 'true', status: 'CORRUPTED', pending: -1});
                 }
             }
@@ -444,9 +449,21 @@ async function setupTxListener(tx_id_string, type, model_id) {
                 if (status.status === 'PENDING'){
                     let pending = status.pending - 1;
                     if (pending === 0){
-                        console.log('submit_time_valid', new Date().getTime() - START_TIMER);// the time it took to submit all the pages
+                        if (AVG === 'true'){
+                            if (AVG_COUNTER === 0){
+                                console.log('avg_submit_time_valid', AVG_SUBMIT_LATENCY/AVG_COUNT);
+                            }else{
+                                AVG_SUBMIT_LATENCY += new Date().getTime() - start_timer;
+                            }
+                        }else{
+                            console.log('submit_time_valid', new Date().getTime() - start_timer);// the time it took to submit all the pages
+                        }
+                        
                         submit_tx_map_meta.set(model_id, {is_completed: 'true', status: 'VALID', pending: pending});
                     }else{
+                        if (AVG === 'true'){
+                            AVG_SUBMIT_LATENCY += new Date().getTime() - start_timer;
+                        }
                         submit_tx_map_meta.set(model_id, {is_completed: 'false', status: 'PENDING', pending: pending});
                     }
                 }
@@ -612,6 +629,7 @@ app.get("/model", wrapAsync(async function(req, res, next){
 }));
 
 app.put('/model/submit', wrapAsync(async function (req, res, next){
+    AVG_COUNTER -= 1;
     let start_timer = new Date().getTime();//milliseconds
     if (!req.body.hasOwnProperty('token')){
         console.log('submit_time', new Date().getTime() - start_timer);
@@ -685,7 +703,15 @@ app.put('/model/submit', wrapAsync(async function (req, res, next){
         pages.push(Tx_Page);
     }
     Tx_Meta.page_number = pages.length;
-    console.log('submit_preprocessing_time', new Date().getTime() - start_timer); //does not include the submission to the blockchain delay
+    if (AVG === 'true'){
+        if (AVG_COUNTER === 0){
+            console.log('avg_submit_preprocessing_time', AVG_SUBMIT_PROCESSING_TIME/AVG_COUNT);
+        }else{
+            AVG_SUBMIT_PROCESSING_TIME += new Date().getTime() - start_timer;
+        }
+    }else{
+        console.log('submit_preprocessing_time', new Date().getTime() - start_timer); //does not include the submission to the blockchain delay
+    }
     try {
         res.status(200).send({'message':'OK'});
         LAST = 'false';
@@ -694,14 +720,22 @@ app.put('/model/submit', wrapAsync(async function (req, res, next){
         for (let i = 0; i < pages.length; i++){
             if (i == pages.length-1){
                 LAST = 'true';
-                START_TIMER = start_timer;
+                //START_TIMER = start_timer;
             }
-            await submitPage(pages[i],req.body.token, req.body.data.id);
+            await submitPage(pages[i],req.body.token, req.body.data.id, start_timer);
         }
     }catch(e){
         console.log(e);
         submit_tx_map_meta.set(req.body.data.id, {is_completed: 'false', status: 'ERROR', pending: -1});
-        console.log('submit_time', new Date().getTime() - start_timer);
+        if (AVG === 'true'){
+            if (AVG_COUNTER === 0){
+                console.log('avg_submit_time', AVG_SUBMIT_LATENCY/AVG_COUNT);
+            }else{
+                AVG_SUBMIT_LATENCY += new Date().getTime() - start_timer;
+            }
+        }else{
+            console.log('submit_time', new Date().getTime() - start_timer);
+        }        
         res.status(500).send({'message':'Internal Server Error: Failed to submit model ' + req.body.data.id + '.'});
         return
     }
@@ -1074,4 +1108,4 @@ if (require.main === module){
 
 
 
-//node --max-old-space-size=4096 server.js compress-json 10 false
+//node --max-old-space-size=4096 server.js compress-json 10 false true 10

@@ -6,6 +6,8 @@ const MODEL = myArgs[1]; //darknet | pytorch | tfv2 | tfjs | tflite
 const RUN = myArgs[0]; // submit | retrieve
 const TEST = myArgs[2]; // true | false
 const TEST_MODEL_SIZE = parseInt(myArgs[3]) * 1024 * 1024; //MB
+const AVG_COUNT = parseInt(myArgs[4]);
+const INTERVAL = parseInt(myArgs[5]);
 
 function darknet(){
 	let architecture = fs.readFileSync('./data/experiments/darknet/yolov3.cfg', {encoding: 'base64'});
@@ -349,14 +351,14 @@ function tflite(){
 	return data;
 }
 
-function test_model(size){
+function test_model(size, name){
 	var test_data = Buffer.allocUnsafe(size).fill('s').toString('utf8');
 	
 
 	let data = JSON.stringify({
 		"token": "token",
 		"data": {
-			"id": "test"+(size/(1024*1024)),
+			"id": "test_"+name,
 			"tag1":"tag1",
 			"tag2":"tag2",
 			"serialization_encoding":"utf8",
@@ -379,10 +381,10 @@ function test_model(size){
 	return data;
 }
 
-function submit(model_id){
+function submit(model_id, name){
 	
 	if (TEST === 'true'){
-		var data = test_model(TEST_MODEL_SIZE);
+		var data = test_model(TEST_MODEL_SIZE, name);
 	}else if (model_id === 'darknet'){
 		var data = darknet();
 	}else if (model_id === 'pytorch'){
@@ -448,10 +450,22 @@ function retrieve(model_id){
 }
 
 if (RUN === 'submit'){
-	submit(MODEL);
+
+	let i = 0;
+	let a = new Date();
+	while(i < AVG_COUNT){
+		if (new Date().getTime() >= a.getTime()){
+			submit(MODEL, i);
+			a.setSeconds(a.getSeconds()+INTERVAL);
+			console.log(a.getSeconds());
+			i++;
+		}
+	}
+
+	//submit(MODEL, '');
 }else{
 	retrieve(MODEL);
 }
 
 
-//node experiments.js submit test100 true 100
+//node experiments.js submit test100 true 100 10 1
