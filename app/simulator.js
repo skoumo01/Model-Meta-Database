@@ -468,4 +468,4 @@ if (RUN === 'submit'){
 }
 
 
-//node experiments.js submit test100 true 100 10 1
+//node simulator.js submit test100 true 100 10 1
