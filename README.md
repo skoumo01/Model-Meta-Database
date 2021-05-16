@@ -62,7 +62,7 @@ $ export GOROOT=/usr/local/go
 $ export GOPATH=$HOME/go
 $ export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
 ```
-The above environment will be set for your current session only; alternatively add the above commands in \~/.profile (\~/.bashrc) file.
+The above environment will be set for your current session only; alternatively add the last 3 commands in \~/.profile (\~/.bashrc) file.
 
 
 #### Install Node.js
