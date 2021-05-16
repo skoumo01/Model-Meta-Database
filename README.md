@@ -94,7 +94,7 @@ The above command clones the [fabric-samples](https://github.com/hyperledger/fab
 ```
 $ export PATH=<path to download location>/fabric-samples/bin:$PATH
 ```
-The above environment will be set for your current session only; alternatively add the above commands in \~/.profile (\~/.bashrc) file.
+The above environment will be set for your current session only; alternatively add the above command in \~/.profile (\~/.bashrc) file.
 
 
 #### Clone the project's repository
