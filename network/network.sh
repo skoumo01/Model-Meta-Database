@@ -24,16 +24,11 @@ function printHelp() {
     println "     -ccv <version>  - chaincode version."
     println "     -ccp <path>  - Path to the chaincode."
     println
-    println "     Used with \033[0;32mnetwork.sh testCC\033[0m"
-    println "     -c <channel name> - deploy chaincode to channel"
-    println "     -ccn <name> - the short name of the chaincode to deploy"
-    println
     println "    -h - print this message"
     println
     println " Examples:"
     println "   network.sh up -c mychannel -db couchdb"
     println "   network.sh deployCC -c mychannel -ccn contract_models -ccv 1 -ccp ../chaincode/src/models/ -ccl golang"
-    println "   network.sh testCC -c mychannel -ccn contract_models"
     println "   network.sh down"
     println
 }

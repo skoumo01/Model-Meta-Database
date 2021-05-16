@@ -8,7 +8,7 @@ info:
   title: "Model Meta-Database"
   contact:
     email: "skoumo01@ucy.ac.cy"
-host: "10.16.30.89:3000"
+host: "localhost:3000"
 basePath: "/"
 tags:
 - name: "model"
