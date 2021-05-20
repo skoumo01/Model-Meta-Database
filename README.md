@@ -1,10 +1,23 @@
 # Model-Meta-Database
 
-This repository implements a meta-database intented for model storing and querying. The aspiration is to create both a versioning system for machine learning (ML) models, as well as a user-friendly interface that provides a sufficient set of database-style query options for the purposes of the ML and researching communities.
+This repository implements the basic components for the Application and Storage Layers of _TriaBase_; a database intended for machine learning models.
 
-The meta-database consists of mainly two layers: a NodeJS RESTful service layer (Layer 1) and a Hyperledger Fabric blockchain layer (Layer 2). Layer 1 is used as the database's interface through which clients can submit their query requests. Layer 2 takes care of both the storage and the indexing of the models on the blockchain's peer nodes, using Hyperledger Fabric's concepts and regulations.
+The database consists of 3 layers; the Edge, Application, and Storage Layers.
 
-The following diagram depicts the different components of the meta-database:
+*Layer 1 - Edge Layer*
+At the Edge Layer we find the smart devices of the IoT system. These devices participate in a federated machine learning procedure by training models on their local data and storing them on the blockchain network of TriaBase. After the local training phase is successfully completed, a node called the _Model Aggregator_ retrieves the multiple models from the blockchain network and aggregates them into a single global model that describes the whole system. This global model is then stored on the blockchain network among the local ones, signaling the end of a single training round of the federated learning procedure.
+
+*Layer 2 - Application Layer*
+The Application Layer is an intermediate layer which hides the complexity of the communication with the database's blockchain network. Here we find a REST server which communicates with the blockchain in behalf of its clients (the smart devices from the Edge Layer), who just use its simple endpoints instead. As of now, the supported endpoints offer model submitting, updating and retrieving services, as well as basic metadata querying options, while the aspiration is to create a full database-like service suite.
+
+*Layer 3 - Storage Layer*
+The Storage Layer comprises the system's blockchain network, which serves as TriaBase's secure, transparent and immutable storage medium. At this layer we find Smart Contracts providing the essential data management methods that the REST server from Layer 2 uses to respond to its client requests.
+
+
+Currently, although TriaBase's architecture is platform/framework independent, the federated machine learning procedure is implemented using the Tensorflow machine learning platform, while Layer 2's server utilizes the Node.js runtime environment. Layer 3's blockchain network was constructed using the Hyperledger Fabric framework.
+
+
+Model retrieval processing flow:
 
 ![model-meta-database-architecture](https://i.imgur.com/GMZBIJG.png)
 
@@ -143,3 +156,8 @@ To set-up the blockchain layer (i.e. Layer 2) follow the instructions on  GitHub
 
 ## Contact
 For more information about the project, check out the corresponding webpage [here](https://www.cs.ucy.ac.cy/projects/blockdb/index.html)
+
+## Publications
+For more information about the _TriaBase_ project the following resource links are provided:
+- [Towards a Blockchain Database for Massive IoT Workloads](https://www.cs.ucy.ac.cy/~dzeina/papers/blockdm21-triabase.pdf)
+- [Triastore: A Web 3.0 Blockchain Datastore for Massive IoT Workloads](https://www.cs.ucy.ac.cy/~dzeina/papers/mdm21-triastore.pdf)
