@@ -4,13 +4,13 @@ This repository implements the basic components for the Application and Storage 
 
 The database consists of 3 layers; the Edge, Application, and Storage Layers.
 
-###Layer 1 - Edge Layer
+### Layer 1 - Edge Layer
 At the Edge Layer we find the smart devices of the IoT system. These devices participate in a federated machine learning procedure by training models on their local data and storing them on the blockchain network of TriaBase. After the local training phase is successfully completed, a node called the _Model Aggregator_ retrieves the multiple models from the blockchain network and aggregates them into a single global model that describes the whole system. This global model is then stored on the blockchain network among the local ones, signaling the end of a single training round of the federated learning procedure.
 
-###Layer 2 - Application Layer
+### Layer 2 - Application Layer
 The Application Layer is an intermediate layer which hides the complexity of the communication with the database's blockchain network. Here we find a REST server which communicates with the blockchain in behalf of its clients (the smart devices from the Edge Layer), who just use its simple endpoints instead. As of now, the supported endpoints offer model submitting, updating and retrieving services, as well as basic metadata querying options, while the aspiration is to create a full database-like service suite.
 
-###Layer 3 - Storage Layer
+### Layer 3 - Storage Layer
 The Storage Layer comprises the system's blockchain network, which serves as TriaBase's secure, transparent and immutable storage medium. At this layer we find Smart Contracts providing the essential data management methods that the REST server from Layer 2 uses to respond to its client requests.
 
 
