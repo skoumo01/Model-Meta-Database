@@ -35,9 +35,9 @@ var AVG_SUBMIT_LATENCY = 0;
 var AVG_SUBMIT_PROCESSING_TIME = 0;
 
 app.use(cors());
-app.use(compression());
-app.use(bodyParser.json({limit: '1000mb', extended: true}));
-app.use(bodyParser.urlencoded({limit: '1000mb', extended: true}));
+//app.use(compression());
+app.use(express.json({limit: '1000mb', extended: true}));
+app.use(express.urlencoded({limit: '1000mb', extended: true}));
 
 //////////////////////////////////////////////BLOCKCHAIN CLIENT///////////////////////////////////////////////
 
