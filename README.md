@@ -14,7 +14,9 @@ The Application Layer is an intermediate layer which hides the complexity of the
 The Storage Layer comprises the system's blockchain network, which serves as TriaBase's secure, transparent and immutable storage medium. At this layer we find Smart Contracts providing the essential data management methods that the REST server from Layer 2 uses to respond to its client requests.
 
 
+
 Currently, although TriaBase's architecture is platform/framework independent, the federated machine learning procedure is implemented using the Tensorflow machine learning platform, while Layer 2's server utilizes the Node.js runtime environment. Layer 3's blockchain network was constructed using the Hyperledger Fabric framework.
+
 
 
 Model retrieval processing flow:
