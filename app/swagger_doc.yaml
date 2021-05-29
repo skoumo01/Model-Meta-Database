@@ -1,13 +1,13 @@
 swagger: "2.0"
 info:
-  description: "This is the documentation of the endpoints offered by TriaBase's Application Layer server.
+  description: "This is the documentation of the endpoints offered by Triabase's Application Layer server.
   
     The corresponding GitHub repository can be found [here](https://github.com/skoumo01/Model-Meta-Database).
   
   
     Note: For the following endpoints the (valid) token 'token' can be used. This is for demonstration purposes only."
   version: "1.0.0"
-  title: "TriaBase"
+  title: "Triabase"
 host: "localhost:3000"
 basePath: "/"
 tags:
