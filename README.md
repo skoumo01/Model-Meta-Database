@@ -1,4 +1,4 @@
-# Model-Meta-Database
+# Triabase
 
 This repository implements the basic components for the Application and Storage Layers of _TriaBase_; a database intended for machine learning models.
 
@@ -160,6 +160,7 @@ To set-up the blockchain layer (i.e. Layer 2) follow the instructions on  GitHub
 For more information about the project, check out the corresponding webpage [here](https://www.cs.ucy.ac.cy/projects/blockdb/index.html)
 
 ## Publications
-For more information about the _TriaBase_ project the following resource links are provided:
+Because of its limited capabilities, this first version of the system is more suitably called _Triastore_ in the related articles.
+For more information about _Triastore_ the following resource links are provided:
 - [Towards a Blockchain Database for Massive IoT Workloads](https://www.cs.ucy.ac.cy/~dzeina/papers/blockdm21-triabase.pdf)
 - [Triastore: A Web 3.0 Blockchain Datastore for Massive IoT Workloads](https://www.cs.ucy.ac.cy/~dzeina/papers/mdm21-triastore.pdf)
