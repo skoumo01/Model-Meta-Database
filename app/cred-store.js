@@ -1,6 +1,3 @@
-/**
- * Demonstrates the setup of the credential store
- */
 const fs = require('fs');
 const Client = require('fabric-client');
 const path = require('path');
